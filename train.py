@@ -1,6 +1,7 @@
 import os
 import sys
-sys.path.append('../Img2Txt')
+import argparse
+#sys.path.append('../Img2Txt') #Image2Text/GitRepos/D ->E/coco2014
 
 from pycocotools.coco import COCO
 
@@ -31,23 +32,23 @@ transform_train = transforms.Compose([
                          (0.229, 0.224, 0.225))])
 
 
-# Set the minimum word count threshold.
-vocab_threshold = 5
-
-# Specify the batch size.
-#batch_size = 10
-
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 if __name__  == "__main__":
 
     nltk.download('punkt')
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("num_epochs", type=int,
+                        help="num of epoches")
+    parser.add_argument("-val", "--make_validation", type=bool)
+    args = parser.parse_args()
+
 
     embed_size=512
     batch_size = 512    
-    vocab_threshold = 5
-    vocab_from_file = True
+    vocab_threshold = 3
+    vocab_from_file = False
     hidden_size = 1024
 
     train_data_loader = get_loader(transform=transform_train,
@@ -64,30 +65,18 @@ if __name__  == "__main__":
                                 vocab_from_file=vocab_from_file,
                                 cocoapi_loc='')                            
 
-
-    # indices = data_loader.dataset.get_train_indices()
     vocab_size = len(train_data_loader.dataset.vocab)
-
-    # new_sampler = data.sampler.SubsetRandomSampler(indices=indices)
-    # data_loader.batch_sampler.sampler = new_sampler
-
 
     encoder=EncoderCNN(embed_size)
     encoder=encoder.to(device)
 
-    # decoder=DecoderRNN(embed_size=512, hidden_size=1024 , vocab_size=8856, num_layers=1)
     decoder=DecoderRNN(embed_size=512, hidden_size=1024 , vocab_size=vocab_size, num_layers=1)
     decoder=decoder.to(device)
 
-
-    num_epochs = 15           
+    num_epochs = args.num_epochs           
     save_every = 1
     save_every_step = 250            
-    print_every = 100         
-    log_file = 'training_log.txt'
-
-    make_validation = False
-
+    print_every = 100
 
     criterion = nn.CrossEntropyLoss()
 
@@ -100,11 +89,15 @@ if __name__  == "__main__":
     total_step = math.ceil(len(train_data_loader.dataset.caption_lengths) / train_data_loader.batch_sampler.batch_size)
     total_val_step = math.ceil(len(val_data_loader.dataset.caption_lengths) / val_data_loader.batch_sampler.batch_size)
 
+    print(len(train_data_loader.dataset.caption_lengths))
 
-    #f = open(log_file, 'w')
     for epoch in range(1, num_epochs+1):
+
         running_loss = 0.0
-        for i_step in range(1, total_step+1):        
+        batches_skiped = 0
+
+        for i_step in range(1, total_step+1):
+
             indices = train_data_loader.dataset.get_train_indices()        
             new_sampler = data.sampler.SubsetRandomSampler(indices=indices)
             train_data_loader.batch_sampler.sampler = new_sampler
@@ -112,69 +105,79 @@ if __name__  == "__main__":
             try:
                 images, captions = next(iter(train_data_loader))
             except:
+                batches_skiped+=1
                 continue
 
             images = images.to(device)
             captions = captions.to(device)
+
             decoder.zero_grad()
             encoder.zero_grad()
+
             features = encoder(images)
             features = features.to(device)
+
             outputs = decoder(features, captions)
-            outputs=outputs.to(device)
+            outputs = outputs.to(device)
+
             loss = criterion(outputs.view(-1, vocab_size), captions.view(-1))
-            #loss = criterion(outputs.view(-1, 8856), captions.view(-1))
             loss.backward()
             optimizer.step()
+
+            # metrics
             running_loss += loss.item() * outputs.size(0) #I added this part =)
             stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f, Perplexity: %5.4f' % (epoch, num_epochs, i_step, total_step, loss.item(), np.exp(loss.item()))
+            
             print('\r' + stats, end="")
             sys.stdout.flush()
-            # f.write(stats + '\n')
-            # f.flush()
             if i_step % print_every == 0:
                 print('\r' + stats)
+            
+            # saving models
             if i_step % save_every_step == 0:
-                torch.save(decoder.state_dict(), os.path.join('./models', 'decoder_%d_stp.pth' % epoch))
-                torch.save(encoder.state_dict(), os.path.join('./models', 'encoder_%d_stp.pth' % epoch))
+                torch.save(decoder.state_dict(), os.path.join('./models', 'decoder_%d_stp.pth' % i_step))
+                torch.save(encoder.state_dict(), os.path.join('./models', 'encoder_%d_stp.pth' % i_step))
+
         if epoch % save_every == 0:
             torch.save(decoder.state_dict(), os.path.join('./models', 'decoder_%d.pth' % epoch))
             torch.save(encoder.state_dict(), os.path.join('./models', 'encoder_%d.pth' % epoch))
+        
+        print('Batches skipped during training: ', batches_skiped)
 
-        if make_validation:
-            for i_step in range(1, total_val_step+1):        
-                indices = val_data_loader.dataset.get_train_indices()        
-                new_sampler = data.sampler.SubsetRandomSampler(indices=indices)
-                val_data_loader.batch_sampler.sampler = new_sampler
+        if args.make_validation:
 
-                try:
-                    images, captions = next(iter(val_data_loader))
-                except:
-                    continue
+            with torch.no_grad():
 
-                images = images.to(device)
-                captions = captions.to(device)
-                decoder.zero_grad()
-                encoder.zero_grad()
-                features = encoder(images)
-                features = features.to(device)
-                outputs = decoder(features, captions)
-                outputs=outputs.to(device)
-                loss = criterion(outputs.view(-1, vocab_size), captions.view(-1))
-                #loss = criterion(outputs.view(-1, 8856), captions.view(-1))
-                loss.backward()
-                optimizer.step()
-                running_loss += loss.item() * outputs.size(0) #I added this part =)
-                stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f, Perplexity: %5.4f' % (epoch, num_epochs, i_step, total_step, loss.item(), np.exp(loss.item()))
-                print('\r' + stats, end="")
-                sys.stdout.flush()
-                # f.write(stats + '\n')
-                # f.flush()
-                if i_step % print_every == 0:
-                    print('\r' + stats)
+                for i_step in range(1, total_val_step+1):        
+                    indices = val_data_loader.dataset.get_train_indices()        
+                    new_sampler = data.sampler.SubsetRandomSampler(indices=indices)
+                    val_data_loader.batch_sampler.sampler = new_sampler
+
+                    try:
+                        images, captions = next(iter(val_data_loader))
+                    except:
+                        continue
+
+                    images = images.to(device)
+                    captions = captions.to(device)
+
+                    decoder.eval()
+                    encoder.eval()
+
+                    features = encoder(images)
+                    features = features.to(device)
+
+                    outputs = decoder(features, captions)
+                    outputs=outputs.to(device)
+                    
+                    loss = criterion(outputs.view(-1, vocab_size), captions.view(-1))
+                    running_loss += loss.item() * outputs.size(0) #I added this part =)
+                    stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f, Perplexity: %5.4f' % (epoch, num_epochs, i_step, total_step, loss.item(), np.exp(loss.item()))
+                    print('\r' + stats, end="")
+                    sys.stdout.flush()
+                    if i_step % print_every == 0:
+                        print('\r' + stats)
 
 
         epoch_loss = running_loss
         print('My loss: ', epoch_loss)
-
-    #f.close()
