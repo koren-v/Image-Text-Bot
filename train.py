@@ -39,29 +39,26 @@ if __name__  == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("num_epochs", type=int,
                         help="num of epoches")
-    parser.add_argument("-val", "--make_validation", type=bool)
+    parser.add_argument("-val", "--make_validation", action="store_true")
     args = parser.parse_args()
 
 
     embed_size=512
     batch_size = 512    
     vocab_threshold = 3
-    vocab_from_file = False
+    vocab_from_file = True
     hidden_size = 1024
 
     train_data_loader = get_loader(transform=transform_train,
                                 mode='train',
                                 batch_size=batch_size,
                                 vocab_threshold=vocab_threshold,
-                                vocab_from_file=vocab_from_file,
-                                cocoapi_loc='')
+                                vocab_from_file=vocab_from_file)
 
     val_data_loader = get_loader(transform=transform_train,
-                                mode='train',
+                                mode='val',
                                 batch_size=batch_size,
-                                vocab_threshold=vocab_threshold,
-                                vocab_from_file=vocab_from_file,
-                                cocoapi_loc='')                            
+                                vocab_from_file=True)                            
 
     vocab_size = len(train_data_loader.dataset.vocab)
 
@@ -87,7 +84,8 @@ if __name__  == "__main__":
     total_step = math.ceil(len(train_data_loader.dataset.caption_lengths) / train_data_loader.batch_sampler.batch_size)
     total_val_step = math.ceil(len(val_data_loader.dataset.caption_lengths) / val_data_loader.batch_sampler.batch_size)
 
-    print(len(train_data_loader.dataset.caption_lengths))
+    print('Start Training!')
+    print(args.make_validation)
 
     for epoch in range(1, num_epochs+1):
 
@@ -106,6 +104,9 @@ if __name__  == "__main__":
             except:
                 batches_skiped+=1
                 continue
+
+            if i_step == 6:
+                break
 
             images = images.to(device)
             captions = captions.to(device)
@@ -144,9 +145,14 @@ if __name__  == "__main__":
 
         if args.make_validation:
 
+            print('Start validation!')
+
             with torch.no_grad():
 
-                for i_step in range(1, total_val_step+1):        
+                for i_step in range(1, total_val_step+1): 
+
+                    if i_step == 6:
+                        break        
                     indices = val_data_loader.dataset.get_train_indices()        
                     new_sampler = data.sampler.SubsetRandomSampler(indices=indices)
                     val_data_loader.batch_sampler.sampler = new_sampler
@@ -177,8 +183,8 @@ if __name__  == "__main__":
                         print('\r' + stats)
 
 
-        train_epoch_loss = train_running_loss #/dataset.size
-        eval_epoch_loss = eval_running_loss #/dataset.size
-        print('Train loss: ', train_epoch_loss)
-        print('Train loss: ', eval_epoch_loss)
+        train_epoch_loss = train_running_loss / len(train_data_loader.dataset.caption_lengths)
+        eval_epoch_loss = eval_running_loss / len(val_data_loader.dataset.caption_lengths)
+        print('\nTrain loss: ', train_epoch_loss)
+        print('Eval loss: ', eval_epoch_loss)
         print('Batches skipped during training: ', batches_skiped)
