@@ -3,8 +3,6 @@ import sys
 import argparse
 #sys.path.append('../Img2Txt') #Image2Text/GitRepos/D ->E/coco2014
 
-from pycocotools.coco import COCO
-
 import nltk
 
 from data_loader import get_loader
@@ -93,7 +91,8 @@ if __name__  == "__main__":
 
     for epoch in range(1, num_epochs+1):
 
-        running_loss = 0.0
+        train_running_loss = 0.0
+        eval_running_loss = 0.0
         batches_skiped = 0
 
         for i_step in range(1, total_step+1):
@@ -125,8 +124,8 @@ if __name__  == "__main__":
             optimizer.step()
 
             # metrics
-            running_loss += loss.item() * outputs.size(0) #I added this part =)
-            stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f, Perplexity: %5.4f' % (epoch, num_epochs, i_step, total_step, loss.item(), np.exp(loss.item()))
+            train_running_loss += loss.item() * outputs.size(0) #I added this part =)
+            stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f' % (epoch, num_epochs, i_step, total_step, loss.item())
             
             print('\r' + stats, end="")
             sys.stdout.flush()
@@ -135,14 +134,13 @@ if __name__  == "__main__":
             
             # saving models
             if i_step % save_every_step == 0:
-                torch.save(decoder.state_dict(), os.path.join('./models', 'decoder_%d_stp.pth' % i_step))
-                torch.save(encoder.state_dict(), os.path.join('./models', 'encoder_%d_stp.pth' % i_step))
+                torch.save(decoder.state_dict(), os.path.join('./models', 'decoder_%d_stp_%.2f_loss.pth' % (i_step,loss.item())))
+                torch.save(encoder.state_dict(), os.path.join('./models', 'encoder_%d_stp_%.2f_loss.pth' % (i_step,loss.item())))
 
         if epoch % save_every == 0:
             torch.save(decoder.state_dict(), os.path.join('./models', 'decoder_%d.pth' % epoch))
             torch.save(encoder.state_dict(), os.path.join('./models', 'encoder_%d.pth' % epoch))
-        
-        print('Batches skipped during training: ', batches_skiped)
+
 
         if args.make_validation:
 
@@ -171,13 +169,16 @@ if __name__  == "__main__":
                     outputs=outputs.to(device)
                     
                     loss = criterion(outputs.view(-1, vocab_size), captions.view(-1))
-                    running_loss += loss.item() * outputs.size(0) #I added this part =)
-                    stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f, Perplexity: %5.4f' % (epoch, num_epochs, i_step, total_step, loss.item(), np.exp(loss.item()))
+                    eval_running_loss += loss.item() * outputs.size(0) #I added this part =)
+                    stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f' % (epoch, num_epochs, i_step, total_step, loss.item())
                     print('\r' + stats, end="")
                     sys.stdout.flush()
                     if i_step % print_every == 0:
                         print('\r' + stats)
 
 
-        epoch_loss = running_loss
-        print('My loss: ', epoch_loss)
+        train_epoch_loss = train_running_loss #/dataset.size
+        eval_epoch_loss = eval_running_loss #/dataset.size
+        print('Train loss: ', train_epoch_loss)
+        print('Train loss: ', eval_epoch_loss)
+        print('Batches skipped during training: ', batches_skiped)
