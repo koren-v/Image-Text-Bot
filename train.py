@@ -43,12 +43,15 @@ if __name__  == "__main__":
     parser.add_argument("--vocab_file", action="store_true")
     parser.add_argument("--load_model", action="store_true")
     parser.add_argument("--unfreeze_encoder", action="store_true")
-    parser.add_argument("--sgd", action="store_true")
+    parser.add_argument("-bs", "--bachsize", type=int)
     args = parser.parse_args()
 
 
     embed_size=512
-    batch_size = 512    
+    if args.bachsize:
+        batch_size = args.bachsize
+    else:
+        batch_size = 512   
     vocab_threshold = 3
     vocab_from_file = args.vocab_file
     hidden_size = 1024
@@ -98,10 +101,8 @@ if __name__  == "__main__":
         params = list(decoder.parameters()) + list(encoder.linear.parameters()) + list(encoder.bn1.parameters())
 
     learning_rate=args.lr
-    if args.sgd:
-        optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9)
-    else:
-        optimizer = torch.optim.Adam(params,lr=learning_rate)
+
+    optimizer = torch.optim.Adam(params,lr=learning_rate)
     
     total_step = math.ceil(len(train_data_loader.dataset.caption_lengths) / train_data_loader.batch_sampler.batch_size)
     total_val_step = math.ceil(len(val_data_loader.dataset.caption_lengths) / val_data_loader.batch_sampler.batch_size)
