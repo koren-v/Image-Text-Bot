@@ -40,13 +40,14 @@ if __name__  == "__main__":
                         help="num of epoches")
     parser.add_argument("lr", type=float)
     parser.add_argument("-val", "--make_validation", action="store_true")
+    parser.add_argument("-vocab", "--vocab_file", action="store_true")
     args = parser.parse_args()
 
 
     embed_size=512
     batch_size = 512    
     vocab_threshold = 3
-    vocab_from_file = True
+    vocab_from_file = args.vocab_file
     hidden_size = 1024
 
     train_data_loader = get_loader(transform=transform_train,
@@ -105,9 +106,6 @@ if __name__  == "__main__":
                 batches_skiped+=1
                 continue
 
-            if i_step == 2:
-                break
-
             images = images.to(device)
             captions = captions.to(device)
 
@@ -150,9 +148,7 @@ if __name__  == "__main__":
             with torch.no_grad():
 
                 for i_step in range(1, total_val_step+1): 
-
-                    if i_step == 2:
-                        break        
+        
                     indices = val_data_loader.dataset.get_train_indices()        
                     new_sampler = data.sampler.SubsetRandomSampler(indices=indices)
                     val_data_loader.batch_sampler.sampler = new_sampler
