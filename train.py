@@ -182,9 +182,6 @@ if __name__  == "__main__":
                     images = images.to(device)
                     captions = captions.to(device)
 
-                    decoder.eval()
-                    encoder.eval()
-
                     features = encoder(images)
                     features = features.to(device)
 
