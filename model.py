@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models
+import copy
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class EncoderCNN(nn.Module):
     def __init__(self, embed_size):
         super(EncoderCNN, self).__init__()
-        resnet = models.resnet50(pretrained=True)
+        resnet = models.resnet101(pretrained=True)
         for param in resnet.parameters():
             param.requires_grad_(False)
         
@@ -39,15 +40,16 @@ class DecoderRNN(nn.Module):
                             bidirectional=False)        
         
     def init_hidden(self, batch_size):        
-        return torch.zeros(1, batch_size, self.hidden_size).to(device),torch.zeros(1, batch_size, self.hidden_size).to(device)
+        return torch.zeros(1, batch_size, self.hidden_size).to(device), \
+                torch.zeros(1, batch_size, self.hidden_size).to(device)
 
     def forward(self, features, captions):
-        captions = captions[:, :-1]     #???
+        captions = captions[:, :-1]  #== we drop last token in input example
         self.batch_size = features.shape[0]
         self.hidden = self.init_hidden(self.batch_size)
         embeds = self.word_embeddings(captions)       
-        inputs = torch.cat((features.unsqueeze(dim=1),embeds), dim=1)                      
-        lstm_out, self.hidden = self.lstm(inputs,self.hidden)
+        inputs = torch.cat((features.unsqueeze(dim=1),embeds), dim=1)   #after getting vectors for each token we                     
+        lstm_out, self.hidden = self.lstm(inputs,self.hidden)           #add to begining of input vector from CNN
         outputs=self.linear(lstm_out)       
         return outputs 
 
@@ -75,3 +77,28 @@ class DecoderRNN(nn.Module):
                 break
 
         return cap_output    
+
+
+# class DecoderTransform(nn.Module):
+#     def __init__(self, embed_size, vocab_size, num_layers=1):
+#         super(DecoderTransform, self).__init__()
+#         #self.hidden_size = hidden_size
+#         self.vocab_size = vocab_size
+#         self.num_layers=num_layers
+#         self.word_embeddings = nn.Embedding(vocab_size, embed_size)
+#         #self.linear = nn.Linear(hidden_size, vocab_size)        
+#         self.transformer = nn.Transformer()
+
+#     def forward(self, features, captions):
+#         import pdb
+#         pdb.set_trace()
+#         target_caption = copy.deepcopy(captions)
+#         captions = captions[:, :-1]    
+#         self.batch_size = features.shape[0]
+#         self.hidden = self.init_hidden(self.batch_size)
+#         embeds = self.word_embeddings(captions)
+#         target = self.word_embeddings(target_caption)     
+#         inputs = torch.cat((features.unsqueeze(dim=1),embeds), dim=1)                      
+#         output = self.transformer(inputs, target)
+#         #outputs=self.linear(output)       
+#         return output 

@@ -1,7 +1,6 @@
 import os
 import sys
 import argparse
-#sys.path.append('../Img2Txt') #Image2Text/GitRepos/D ->E/coco2014
 
 import nltk
 
@@ -39,6 +38,7 @@ if __name__  == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("num_epochs", type=int,
                         help="num of epoches")
+    parser.add_argument("lr", type=float)
     parser.add_argument("-val", "--make_validation", action="store_true")
     args = parser.parse_args()
 
@@ -78,7 +78,7 @@ if __name__  == "__main__":
     #we don't train resnet
     params = list(decoder.parameters()) + list(encoder.linear.parameters()) + list(encoder.bn1.parameters())
 
-    learning_rate=0.006
+    learning_rate=args.lr
     optimizer = torch.optim.Adam(params,lr=learning_rate)
     
     total_step = math.ceil(len(train_data_loader.dataset.caption_lengths) / train_data_loader.batch_sampler.batch_size)
@@ -105,7 +105,7 @@ if __name__  == "__main__":
                 batches_skiped+=1
                 continue
 
-            if i_step == 6:
+            if i_step == 2:
                 break
 
             images = images.to(device)
@@ -151,7 +151,7 @@ if __name__  == "__main__":
 
                 for i_step in range(1, total_val_step+1): 
 
-                    if i_step == 6:
+                    if i_step == 2:
                         break        
                     indices = val_data_loader.dataset.get_train_indices()        
                     new_sampler = data.sampler.SubsetRandomSampler(indices=indices)
