@@ -25,6 +25,14 @@ class EncoderCNN(nn.Module):
         
         return features
 
+    def freeze_encoder(self):
+        for param in self.resnet.parameters():
+            param.requires_grad = False
+    
+    def unfreeze_encoder(self):
+        for param in self.resnet.parameters():
+            param.requires_grad = True
+
 class DecoderRNN(nn.Module):
     def __init__(self, embed_size, hidden_size, vocab_size, num_layers=1):
         super(DecoderRNN, self).__init__()

@@ -40,7 +40,9 @@ if __name__  == "__main__":
                         help="num of epoches")
     parser.add_argument("lr", type=float)
     parser.add_argument("-val", "--make_validation", action="store_true")
-    parser.add_argument("-vocab", "--vocab_file", action="store_true")
+    parser.add_argument("--vocab_file", action="store_true")
+    parser.add_argument("--load_model", action="store_true")
+    parser.add_argument("--unfreeze_encoder", action="store_true")
     args = parser.parse_args()
 
 
@@ -69,6 +71,18 @@ if __name__  == "__main__":
     decoder=DecoderRNN(embed_size=512, hidden_size=1024 , vocab_size=vocab_size, num_layers=1)
     decoder=decoder.to(device)
 
+
+    if args.load_model:
+        name = input('Type name of encoder/decoder')
+        if torch.cuda.is_available():
+            encoder.load_state_dict(torch.load('./models/encoder'+name+'.pkl'))
+            decoder.load_state_dict(torch.load('./models/decoder'+name+'.pkl'))
+        else:
+            encoder.load_state_dict(torch.load('./models/encoder'+name+'.pkl', 
+                                            map_location=torch.device('cpu')))
+            decoder.load_state_dict(torch.load('./models/encoder'+name+'.pkl', 
+                                            map_location=torch.device('cpu')))
+
     num_epochs = args.num_epochs           
     save_every = 1
     save_every_step = 250            
@@ -76,8 +90,11 @@ if __name__  == "__main__":
 
     criterion = nn.CrossEntropyLoss()
 
-    #we don't train resnet
-    params = list(decoder.parameters()) + list(encoder.linear.parameters()) + list(encoder.bn1.parameters())
+    if args.unfreeze_encoder:
+        encoder.unfreeze_encoder()
+        params = list(decoder.parameters()) + list(encoder.parameters())
+    else:
+        params = list(decoder.parameters()) + list(encoder.linear.parameters()) + list(encoder.bn1.parameters())
 
     learning_rate=args.lr
     optimizer = torch.optim.Adam(params,lr=learning_rate)
@@ -172,7 +189,7 @@ if __name__  == "__main__":
                     
                     loss = criterion(outputs.view(-1, vocab_size), captions.view(-1))
                     eval_running_loss += loss.item() * outputs.size(0) #I added this part =)
-                    stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f' % (epoch, num_epochs, i_step, total_step, loss.item())
+                    stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f' % (epoch, num_epochs, i_step, total_val_step, loss.item())
                     print('\r' + stats, end="")
                     sys.stdout.flush()
                     if i_step % print_every == 0:
