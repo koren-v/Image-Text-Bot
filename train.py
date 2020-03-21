@@ -153,19 +153,17 @@ if __name__  == "__main__":
             if i_step % print_every == 0:
                 print('\r' + stats)
             
-            # saving models
-            if i_step % save_every_step == 0:
-                torch.save(decoder.state_dict(), os.path.join('./models', 'decoder_%d_stp_%.2f_loss.pth' % (i_step,loss.item())))
-                torch.save(encoder.state_dict(), os.path.join('./models', 'encoder_%d_stp_%.2f_loss.pth' % (i_step,loss.item())))
+            # # saving models
+            # if i_step % save_every_step == 0:
+            #     torch.save(decoder.state_dict(), os.path.join('./models', 'decoder_%d_stp_%.2f_loss.pth' % (i_step,loss.item())))
+            #     torch.save(encoder.state_dict(), os.path.join('./models', 'encoder_%d_stp_%.2f_loss.pth' % (i_step,loss.item())))
 
-        if epoch % save_every == 0:
-            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder_%d.pth' % epoch))
-            torch.save(encoder.state_dict(), os.path.join('./models', 'encoder_%d.pth' % epoch))
+
 
 
         if args.make_validation:
 
-            print('Start validation!')
+            print('\nStart validation!')
 
             with torch.no_grad():
 
@@ -197,9 +195,13 @@ if __name__  == "__main__":
                     if i_step % print_every == 0:
                         print('\r' + stats)
 
-
         train_epoch_loss = train_running_loss / len(train_data_loader.dataset.caption_lengths)
         eval_epoch_loss = eval_running_loss / len(val_data_loader.dataset.caption_lengths)
+
+        if epoch % save_every == 0:
+            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder_%d_%.2f_v_%.2f_t.pth' % (epoch, eval_epoch_loss, train_epoch_loss)))
+            torch.save(encoder.state_dict(), os.path.join('./models', 'encoder_%d_%.2f_v_%.2f_t.pth' % (epoch, eval_epoch_loss, train_epoch_loss)))
+
         print('\nTrain loss: ', train_epoch_loss)
         print('Eval loss: ', eval_epoch_loss)
         print('Batches skipped during training: ', batches_skiped)
