@@ -78,15 +78,14 @@ if __name__  == "__main__":
 
 
     if args.load_model:
-        name1 = input('Type name of encoder')
-        name2 = input('Type name of decoder')       
+        name = input('Type name of encoder/decoder')   
         if torch.cuda.is_available():
-            encoder.load_state_dict(torch.load('./models/encoder'+name1+'.pkl'))
-            decoder.load_state_dict(torch.load('./models/decoder'+name2+'.pkl'))
+            encoder.load_state_dict(torch.load('./models/encoder'+name+'.pth'))
+            decoder.load_state_dict(torch.load('./models/decoder'+name+'.pth'))
         else:
-            encoder.load_state_dict(torch.load('./models/encoder'+name1+'.pkl', 
+            encoder.load_state_dict(torch.load('./models/encoder'+name+'.pth', 
                                             map_location=torch.device('cpu')))
-            decoder.load_state_dict(torch.load('./models/encoder'+name2+'.pkl', 
+            decoder.load_state_dict(torch.load('./models/encoder'+name+'.pth', 
                                             map_location=torch.device('cpu')))
 
     num_epochs = args.num_epochs           
