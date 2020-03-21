@@ -86,6 +86,31 @@ class DecoderRNN(nn.Module):
 
         return cap_output    
 
+#     def beam_decode(self, decoder_hiddens, encoder_outputs):
+
+#         beam_width = 10
+#         topk = 1
+#         decoded_batch = []
+
+#         for idx in range(999):
+#             hidden = self.init_hidden(batch_size)
+
+
+# class BeamSearchNode(object):
+#     def __init__(self, hiddenstate, previusNode, wordId, logProb, length):
+
+#         self.h = hiddenstate,
+#         self.previusNode = previusNode
+#         self.wordId = wordId
+#         self.logp = logProb
+#         self.leng = length
+
+#     def eval(self):
+#         return self.logp / float(self.leng -1 + 1e-6)
+
+
+
+
 
 # class DecoderTransform(nn.Module):
 #     def __init__(self, embed_size, vocab_size, num_layers=1):
