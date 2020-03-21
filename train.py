@@ -54,7 +54,7 @@ if __name__  == "__main__":
     else:
         batch_size = 512   
     vocab_threshold = 3
-    vocab_from_file = args.vocab_file
+    vocab_from_file = args.vocab_from_file
     hidden_size = 1024
 
     train_data_loader = get_loader(transform=transform_train,
