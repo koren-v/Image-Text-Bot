@@ -61,7 +61,7 @@ if __name__  == "__main__":
 
     vocab_threshold = 3
     vocab_from_file = args.vocab_from_file
-    hidden_size = 1024
+    #hidden_size = 1024
 
     train_data_loader = get_loader(transform=transform_train,
                                 mode='train',
@@ -79,7 +79,7 @@ if __name__  == "__main__":
     encoder=EncoderCNN(embed_size)
     encoder=encoder.to(device)
 
-    decoder=DecoderRNN(embed_size=512, hidden_size=1024 , vocab_size=vocab_size, num_layers=num_layers)
+    decoder=DecoderRNN(embed_size=512, hidden_size=768 , vocab_size=vocab_size, num_layers=num_layers)
     decoder=decoder.to(device)
 
 
