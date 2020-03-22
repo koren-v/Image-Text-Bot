@@ -48,8 +48,8 @@ class DecoderRNN(nn.Module):
                             bidirectional=False)        
         
     def init_hidden(self, batch_size):        
-        return torch.zeros(1, batch_size, self.hidden_size).to(device), \
-                torch.zeros(1, batch_size, self.hidden_size).to(device)
+        return torch.zeros(self.num_layers, batch_size, self.hidden_size).to(device), \
+                torch.zeros(self.num_layers, batch_size, self.hidden_size).to(device)
 
     def forward(self, features, captions):
         captions = captions[:, :-1]  #== we drop last token in input example
