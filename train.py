@@ -167,6 +167,7 @@ if __name__  == "__main__":
 
             images = images.to(device)
             captions = captions.to(device)
+            tgt_key_padding_mask = tgt_key_padding_mask.to(device)
 
             decoder.zero_grad()
             encoder.zero_grad()
