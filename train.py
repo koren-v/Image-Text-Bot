@@ -48,11 +48,12 @@ if __name__  == "__main__":
     parser.add_argument("--encoder_lr", type=float)
     parser.add_argument("--decoder_lr", type=float)
     parser.add_argument("--stage")
+    parser.add_argument("--cnn")
     parser.add_argument("-val", "--make_validation", action="store_true")
     parser.add_argument("--vocab_from_file", action="store_true")
     parser.add_argument("--load_model", action="store_true")
     parser.add_argument("--unfreeze_encoder", action="store_true")
-    #parser.add_argument("--num_layers", type=int)
+    parser.add_argument("--num_layers", type=int)
     parser.add_argument("-bs", "--batchsize", type=int)
     args = parser.parse_args()
 
@@ -62,10 +63,10 @@ if __name__  == "__main__":
         batch_size = args.batchsize
     else:
         batch_size = 512
-    # if args.num_layers:
-    #     num_layers = args.num_layers
-    # else:
-    #     num_layers = 1
+    if args.num_layers:
+        num_layers = args.num_layers
+    else:
+        num_layers = 1
 
     vocab_threshold = 3
     vocab_from_file = args.vocab_from_file
@@ -84,7 +85,11 @@ if __name__  == "__main__":
 
     vocab_size = len(train_data_loader.dataset.vocab)
 
-    encoder=EncoderCNN(embed_size)
+    if args.cnn:
+        cnn = args.cnn
+    else:
+        cnn = 'resnet101'
+    encoder=EncoderCNN(embed_size, cnn)
     encoder=encoder.to(device)
 
     # decoder=DecoderRNN(embed_size=512, hidden_size=768 , vocab_size=vocab_size, num_layers=num_layers)

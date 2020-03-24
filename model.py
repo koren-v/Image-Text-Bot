@@ -9,19 +9,22 @@ import torch.nn.functional as F
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class EncoderCNN(nn.Module):
-    def __init__(self, embed_size):
+    def __init__(self, embed_size, cnn):
         super(EncoderCNN, self).__init__()
-        resnet = models.resnet101(pretrained=True)
-        for param in resnet.parameters():
+        if cnn == 'resnet101':
+            encoder = models.resnet101(pretrained=True)
+        elif cnn == 'vgg19':
+            encoder = models.vgg19(pretrained=True)
+        for param in encoder.parameters():
             param.requires_grad_(False)
         
-        modules = list(resnet.children())[:-1]        
-        self.resnet = nn.Sequential(*modules)
-        self.linear = nn.Linear(resnet.fc.in_features, embed_size)        
+        modules = list(encoder.children())[:-1]        
+        self.encoder = nn.Sequential(*modules)
+        self.linear = nn.Linear(encoder.fc.in_features, embed_size)        
         self.bn1 = nn.BatchNorm1d(embed_size)        
         
     def forward(self, images):
-        features = self.resnet(images)
+        features = self.encoder(images)
         features = features.view(features.size(0), -1)
         features = self.linear(features)
         features = self.bn1(features)
