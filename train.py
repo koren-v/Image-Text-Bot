@@ -180,7 +180,7 @@ if __name__  == "__main__":
             features = encoder(images)
             features = features.to(device)
 
-            captions_inp, captions_out = captions[:, :-1], captions[:, 1:]
+            captions_inp, captions_out = captions[:, :-1], captions[:, 1:].contiguous()
 
             tgt_mask = gen_nopeek_mask(captions_inp.shape[1])
             tgt_mask = tgt_mask.to(device)
@@ -223,7 +223,7 @@ if __name__  == "__main__":
                     images = images.to(device)
                     captions = captions.to(device)
                     tgt_key_padding_mask = tgt_key_padding_mask.to(device)
-                    
+
                     features = encoder(images)
                     features = features.to(device)
 
