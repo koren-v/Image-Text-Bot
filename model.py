@@ -1,14 +1,16 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models
+import numpy as np
 import copy
+import torch.nn.functional as F
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class EncoderCNN(nn.Module):
     def __init__(self, embed_size):
         super(EncoderCNN, self).__init__()
-        resnet = models.resnet50(pretrained=True)
+        resnet = models.resnet101(pretrained=True)
         for param in resnet.parameters():
             param.requires_grad_(False)
         
@@ -24,14 +26,6 @@ class EncoderCNN(nn.Module):
         features = self.bn1(features)
         
         return features
-
-    def freeze_encoder(self):
-        for param in self.resnet.parameters():
-            param.requires_grad = False
-    
-    def unfreeze_encoder(self):
-        for param in self.resnet.parameters():
-            param.requires_grad = True
 
 class DecoderRNN(nn.Module):
     def __init__(self, embed_size, hidden_size, vocab_size, num_layers=1):
@@ -49,15 +43,15 @@ class DecoderRNN(nn.Module):
         
     def init_hidden(self, batch_size):        
         return torch.zeros(self.num_layers, batch_size, self.hidden_size).to(device), \
-                torch.zeros(self.num_layers, batch_size, self.hidden_size).to(device)
+                                torch.zeros(self.num_layers, batch_size, self.hidden_size).to(device)
 
     def forward(self, features, captions):
-        captions = captions[:, :-1]  #== we drop last token in input example
+        captions = captions[:, :-1]     
         self.batch_size = features.shape[0]
         self.hidden = self.init_hidden(self.batch_size)
         embeds = self.word_embeddings(captions)       
-        inputs = torch.cat((features.unsqueeze(dim=1),embeds), dim=1)   #after getting vectors for each token we                     
-        lstm_out, self.hidden = self.lstm(inputs,self.hidden)           #add to begining of input vector from CNN
+        inputs = torch.cat((features.unsqueeze(dim=1),embeds), dim=1)                      
+        lstm_out, self.hidden = self.lstm(inputs,self.hidden)
         outputs=self.linear(lstm_out)       
         return outputs 
 
@@ -72,7 +66,7 @@ class DecoderRNN(nn.Module):
             lstm_out, hidden = self.lstm(inputs, hidden) 
             outputs = self.linear(lstm_out)  
             outputs = outputs.squeeze(1) 
-            _, max_idx = torch.max(outputs, dim=1) #argmax with no _
+            _, max_idx = torch.max(outputs, dim=1) 
             cap_output.append(max_idx.cpu().numpy()[0].item())             
             if (max_idx == 1):
                 break
@@ -86,52 +80,118 @@ class DecoderRNN(nn.Module):
 
         return cap_output    
 
-#     def beam_decode(self, decoder_hiddens, encoder_outputs):
+    def beam(self, inputs):
 
-#         beam_width = 10
-#         topk = 1
-#         decoded_batch = []
+        k = 10     
+        cap_output = []
+        batch_size = inputs.shape[0]         
+        hidden = self.init_hidden(batch_size)
+        
+        # generating words next after CNN's vector
+        lstm_out, hidden = self.lstm(inputs, hidden) 
+        outputs = self.linear(lstm_out)  
+        outputs = outputs.squeeze(1)
+        outputs = F.log_softmax(outputs, dim=1)
+        top_first_k = torch.topk(outputs, k, dim=1)
 
-#         for idx in range(999):
-#             hidden = self.init_hidden(batch_size)
+        # we will store scores, indexes (in vocab), their embeddings
+        # and hiddens states in separate lists and we will use their orders 
+        scores = top_first_k[0].squeeze(0)
+        indexes = top_first_k[1].squeeze(0)
+        embeddings = [self.word_embeddings(idx.unsqueeze(0)).unsqueeze(1) for idx in indexes]
+
+        # hiddens are the same for k generated words but it will more
+        # convinient to use them in the same 'style' as other objects 
+        hiddens = [hidden]*k
+
+        # collecting sentences
+        sentences = [[index] for index in indexes]
+
+        # startin length of each sentence is 1 now
+        length = 1
+        
+        while True:
+
+            length += 1
+
+            current_scores = torch.tensor([])
+            current_indexes = torch.tensor([], dtype=int)
+            current_hiddens = []
+
+            for i in range(k):
+                
+                # we get embedds and hiddens for each child
+                h = hiddens[i]
+                e = embeddings[i]
+
+                # the same steps
+                lstm_out, h_out = self.lstm(e, h)    
+                outputs = self.linear(lstm_out)
+                outputs = outputs.squeeze(1)
+                outputs = F.log_softmax(outputs, dim=1)
+                top_k = torch.topk(outputs, k, dim=1)
+
+                temp_scores = top_k[0].squeeze(0)
+                temp_indexes = top_k[1].squeeze(0)
+
+                # for each child we add score of their parent score 
+                temp_scores += scores[i]
+
+                current_scores = torch.cat((current_scores, temp_scores))
+                current_indexes = torch.cat((current_indexes, temp_indexes))
+                current_hiddens.extend([h_out]*k)
+
+            
+            candidates = torch.topk(current_scores, k)[1] # indexes in arrays for best childs
+            best_candidates_indexes = current_indexes[candidates] # indexes in vocab -||-
+            best_candidates_scores = current_scores[candidates] # their scores
+            best_hiddens = [current_hiddens[candidate] for candidate in candidates] 
+
+            scores = best_candidates_scores # updating scores
+            indexes = best_candidates_indexes # updating indexes (to generate next words)
+            embeddings = [self.word_embeddings(idx.unsqueeze(0)).unsqueeze(1) for idx in indexes]
+            hiddens = best_hiddens
+
+            # extending current sentences by new words
+            temp = []
+            for i, idx in enumerate(candidates):
+                sts = copy.deepcopy(sentences[idx//k])
+                temp.append(sts)
+                temp[i].append(current_indexes[idx])
+
+            # updatinf current sentences
+            sentences = temp      
+
+            if length == 20:
+                break
+            
+        # deviding score to length of the sentence
+        normalized_score = []
+        for i, score in enumerate(scores):
+            try:
+                score /= sentences[i].index(1)
+            except:
+                score /= len(sentences[i]) # if we don't get by generating <eos> token
+            normalized_score.append(float(score))
 
 
-# class BeamSearchNode(object):
-#     def __init__(self, hiddenstate, previusNode, wordId, logProb, length):
+        print('\nMEAN: ', np.mean(normalized_score))
+        print('STD: ', np.std(normalized_score))
+        print('Normalized score:', max(normalized_score))
 
-#         self.h = hiddenstate,
-#         self.previusNode = previusNode
-#         self.wordId = wordId
-#         self.logp = logProb
-#         self.leng = length
+        # choosing the best
+        best_score = np.argmax(np.array(normalized_score))
+        best_sentence = sentences[best_score]
 
-#     def eval(self):
-#         return self.logp / float(self.leng -1 + 1e-6)
+        # returning truncated sentence 
+        try:
+            best_sentence = best_sentence[:best_sentence.index(1)]
+        except:
+            best_sentence = best_sentence
+        best_sentence =  [int(word) for word in best_sentence]
+
+        return best_sentence
 
 
 
-
-
-# class DecoderTransform(nn.Module):
-#     def __init__(self, embed_size, vocab_size, num_layers=1):
-#         super(DecoderTransform, self).__init__()
-#         #self.hidden_size = hidden_size
-#         self.vocab_size = vocab_size
-#         self.num_layers=num_layers
-#         self.word_embeddings = nn.Embedding(vocab_size, embed_size)
-#         #self.linear = nn.Linear(hidden_size, vocab_size)        
-#         self.transformer = nn.Transformer()
-
-#     def forward(self, features, captions):
-#         import pdb
-#         pdb.set_trace()
-#         target_caption = copy.deepcopy(captions)
-#         captions = captions[:, :-1]    
-#         self.batch_size = features.shape[0]
-#         self.hidden = self.init_hidden(self.batch_size)
-#         embeds = self.word_embeddings(captions)
-#         target = self.word_embeddings(target_caption)     
-#         inputs = torch.cat((features.unsqueeze(dim=1),embeds), dim=1)                      
-#         output = self.transformer(inputs, target)
-#         #outputs=self.linear(output)       
-#         return output 
+        
