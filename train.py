@@ -222,7 +222,8 @@ if __name__  == "__main__":
 
                     images = images.to(device)
                     captions = captions.to(device)
-
+                    tgt_key_padding_mask = tgt_key_padding_mask.to(device)
+                    
                     features = encoder(images)
                     features = features.to(device)
 
