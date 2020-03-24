@@ -109,13 +109,17 @@ class CoCoDataset(data.Dataset):
         self.vocab = Vocabulary(vocab_threshold, vocab_file, start_word,
             end_word, unk_word, annotations_file, vocab_from_file)
         self.img_folder = img_folder
+        self.sel_length = None
 
         if self.mode == 'train':
             self.coco = COCO(annotations_file)
             self.ids = list(self.coco.anns.keys())
             print('Obtaining caption lengths...')
+
             all_tokens = [nltk.tokenize.word_tokenize(str(self.coco.anns[self.ids[index]]['caption']).lower()) for index in tqdm(np.arange(len(self.ids)))]
-            self.caption_lengths = [len(token) for token in all_tokens]
+            # тут ми зібрати довжини для кожного опису (len(caption_lengths)==len(all_tokens)==41k)
+            self.caption_lengths = [len(token) for token in all_tokens]            
+            
             
         if self.mode == 'val':
             self.coco = COCO(annotations_file)
@@ -127,7 +131,7 @@ class CoCoDataset(data.Dataset):
         
     def __getitem__(self, index):
 
-        # obtain image and caption if in training mode
+        # obtain image and caption if in training/val mode
         if self.mode == 'train' or self.mode == 'val':
             ann_id = self.ids[index]
             caption = self.coco.anns[ann_id]['caption']
@@ -139,15 +143,19 @@ class CoCoDataset(data.Dataset):
             image = self.transform(image)
 
             # Convert caption to tensor of word ids.
-            tokens = nltk.tokenize.word_tokenize(str(caption).lower())
+            tokens = nltk.tokenize.word_tokenize(str(caption).lower()) #<----------------- знову для чогось препроцес
             caption = []
+            # forming input tensor 
             caption.append(self.vocab(self.vocab.start_word))
             caption.extend([self.vocab(token) for token in tokens])
             caption.append(self.vocab(self.vocab.end_word))
-            caption = torch.Tensor(caption).long()
+            
+            mask = [False for _ in range(len(caption))] # + [True for _ in range(self.sel_length+1 - len(caption))]
+            # caption+=[0 for _ in range(self.sel_length+1 - len(caption))] # якщо раптом треба буде падити
 
+            caption = torch.Tensor(caption).long()
             # return pre-processed image and caption tensors
-            return image, caption
+            return image, caption, np.array(mask)
         
         # obtain image if in test mode
         else:
@@ -161,10 +169,15 @@ class CoCoDataset(data.Dataset):
             return orig_image, image
 
     def get_train_indices(self):
+        """In this way we get captures in batch with the same length"""
+        # choose some length from all caption's lengths
         sel_length = np.random.choice(self.caption_lengths)
+        # select their indexes
         all_indices = np.where([self.caption_lengths[i] == sel_length for i in np.arange(len(self.caption_lengths))])[0]
+        # all_indices = np.where([self.caption_lengths[i] >= sel_length-1 or self.caption_lengths[i] <= sel_length+1 for i in np.arange(len(self.caption_lengths))])[0]
+        # select batch_size indexes of the chosen lenght
         indices = list(np.random.choice(all_indices, size=self.batch_size))
-        return indices
+        return indices #, sel_length + 1
 
     def __len__(self):
         if self.mode == 'train' or self.mode == 'val':

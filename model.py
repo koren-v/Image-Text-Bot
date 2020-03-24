@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 import numpy as np
+import math
 import copy
 import torch.nn.functional as F
 
@@ -193,5 +194,46 @@ class DecoderRNN(nn.Module):
         return best_sentence
 
 
+class LanguageTransformer(nn.Module):
+    def __init__(self, vocab_size, embedding_size, nhead, num_encoder_layers, num_decoder_layers, dim_feedforward, max_seq_length, pos_dropout, trans_dropout):
+        super().__init__()
+        self.embedding_size = embedding_size
 
-        
+        #self.embed_src = nn.Embedding(vocab_size, embedding_size)
+        self.embed_tgt = nn.Embedding(vocab_size, embedding_size) #vocab_size, embed_size
+        self.pos_enc = PositionalEncoding(embedding_size, pos_dropout, max_seq_length)
+
+        self.transformer = nn.Transformer(embedding_size, nhead, num_encoder_layers, num_decoder_layers, dim_feedforward, trans_dropout)
+        self.fc = nn.Linear(embedding_size, vocab_size)
+
+    def forward(self, src, tgt, tgt_key_padding_mask, tgt_mask):
+        # src = rearrange(src, 'n s -> s n')
+        # tgt = rearrange(tgt, 'n t -> t n')
+        src = src.unsqueeze(0)  # [1, batch_size, embed_size]
+        tgt = tgt.permute(1, 0) # [len_of_capture, batch_size, embed_size]
+
+        # src = self.pos_enc(self.embed_src(src) * math.sqrt(self.embedding_size)) 
+        tgt = self.pos_enc(self.embed_tgt(tgt) * math.sqrt(self.embedding_size))
+
+        output = self.transformer(src, tgt, tgt_mask=tgt_mask, tgt_key_padding_mask=tgt_key_padding_mask)
+
+        # output = rearrange(output, 't n e -> n t e')
+        output = output.permute(1, 0, 2)
+        return self.fc(output)
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, embedding_size, dropout=0.1, max_len=100):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        pe = torch.zeros(max_len, embedding_size)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, embedding_size, 2).float() * (-math.log(10000.0) / embedding_size))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:x.size(0), :]
+        return self.dropout(x)
