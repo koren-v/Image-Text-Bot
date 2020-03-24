@@ -47,13 +47,13 @@ if __name__  == "__main__":
                         help="num of epoches")
     parser.add_argument("--encoder_lr", type=float)
     parser.add_argument("--decoder_lr", type=float)
-    parser.add_argument("--stage", type=int)
+    parser.add_argument("--stage")
     parser.add_argument("-val", "--make_validation", action="store_true")
     parser.add_argument("--vocab_from_file", action="store_true")
     parser.add_argument("--load_model", action="store_true")
     parser.add_argument("--unfreeze_encoder", action="store_true")
     #parser.add_argument("--num_layers", type=int)
-    parser.add_argument("-bs", "--bachsize", type=int)
+    parser.add_argument("-bs", "--batchsize", type=int)
     args = parser.parse_args()
 
 
@@ -143,7 +143,7 @@ if __name__  == "__main__":
     if args.stage:
         stage = args.stage
     else:
-        stage = 0
+        stage = 'default_stage'
 
 
     for epoch in range(1, num_epochs+1):
@@ -241,12 +241,12 @@ if __name__  == "__main__":
 
         if epoch % save_every == 0:
             torch.save(decoder.state_dict(),
-                        os.path.join('./models', 'decoder_%d_%.2f_v_%.2f_t_%d.pth' % (epoch, 
+                        os.path.join('./models', 'decoder_%d_%.2f_v_%.2f_t_%s.pth' % (epoch, 
                                                                                         eval_epoch_loss,
                                                                                         train_epoch_loss, 
                                                                                         stage)))
             torch.save(encoder.state_dict(),
-                        os.path.join('./models', 'encoder_%d_%.2f_v_%.2f_t_%d.pth' % (epoch, 
+                        os.path.join('./models', 'encoder_%d_%.2f_v_%.2f_t_%s.pth' % (epoch, 
                                                                                         eval_epoch_loss, 
                                                                                         train_epoch_loss, 
                                                                                         stage)))
