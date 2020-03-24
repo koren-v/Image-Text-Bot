@@ -19,7 +19,6 @@ import torchvision.models as models
 from model import EncoderCNN, DecoderRNN, LanguageTransformer
 
 
-
 # Define a transform to pre-process the training images.
 transform_train = transforms.Compose([ 
     transforms.Resize(256),                          # smaller edge of image resized to 256
@@ -29,8 +28,6 @@ transform_train = transforms.Compose([
     transforms.Normalize((0.485, 0.456, 0.406),      # normalize image for pre-trained model
                          (0.229, 0.224, 0.225))])
 
-# def pad_sentences(batch):
-#     pass
 
 def gen_nopeek_mask(length):
     mask = torch.triu(torch.ones(length, length)).permute(1, 0)
@@ -48,13 +45,14 @@ if __name__  == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("num_epochs", type=int,
                         help="num of epoches")
-    parser.add_argument("lr", type=float)
+    parser.add_argument("--encoder_lr", type=float)
+    parser.add_argument("--decoder_lr", type=float)
     parser.add_argument("--stage", type=int)
     parser.add_argument("-val", "--make_validation", action="store_true")
     parser.add_argument("--vocab_from_file", action="store_true")
     parser.add_argument("--load_model", action="store_true")
     parser.add_argument("--unfreeze_encoder", action="store_true")
-    parser.add_argument("--num_layers", type=int)
+    #parser.add_argument("--num_layers", type=int)
     parser.add_argument("-bs", "--bachsize", type=int)
     args = parser.parse_args()
 
@@ -64,10 +62,10 @@ if __name__  == "__main__":
         batch_size = args.bachsize
     else:
         batch_size = 512
-    if args.num_layers:
-        num_layers = args.num_layers
-    else:
-        num_layers = 1
+    # if args.num_layers:
+    #     num_layers = args.num_layers
+    # else:
+    #     num_layers = 1
 
     vocab_threshold = 3
     vocab_from_file = args.vocab_from_file
@@ -119,13 +117,21 @@ if __name__  == "__main__":
 
     if args.unfreeze_encoder:
         encoder.unfreeze_encoder()
-        params = list(decoder.parameters()) + list(encoder.parameters())
+        encoder_params = encoder.parameters()
     else:
-        params = list(decoder.parameters()) + list(encoder.linear.parameters()) + list(encoder.bn1.parameters())
+        encoder_params = list(encoder.linear.parameters()) + list(encoder.bn1.parameters())
 
-    learning_rate=args.lr
+    decoder_lr = args.decoder_lr
+    encoder_lr = args.encoder_lr
 
-    optimizer = torch.optim.Adam(params,lr=learning_rate)
+    optimizer = torch.optim.Adam(
+        [
+            {"params":decoder.parameters(),"lr": decoder_lr},
+            {"params":encoder_params, "lr": encoder_lr},
+        
+    ])
+
+    #optimizer = torch.optim.Adam(params,lr=learning_rate)
     
     total_step = math.ceil(len(train_data_loader.dataset.caption_lengths) / train_data_loader.batch_sampler.batch_size)
     total_val_step = math.ceil(len(val_data_loader.dataset.caption_lengths) / val_data_loader.batch_sampler.batch_size)
