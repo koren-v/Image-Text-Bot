@@ -54,7 +54,7 @@ if __name__  == "__main__":
     parser.add_argument("--load_model", action="store_true")
     parser.add_argument("--unfreeze_encoder", action="store_true")
     parser.add_argument("--num_layers", type=int)
-    parser.add_argument("-bs", "--batchsize", type=int)
+    parser.add_argument("-bs", "--batch_size", type=int)
     args = parser.parse_args()
 
 
