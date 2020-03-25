@@ -174,11 +174,12 @@ class CoCoDataset(data.Dataset):
         # choose some length from all caption's lengths
         self.sel_length = np.random.choice(self.caption_lengths)
         # select their indexes
-        # import pdb
-        # pdb.set_trace()
+
         # all_indices = np.where([self.caption_lengths[i] == sel_length for i in np.arange(len(self.caption_lengths))])[0]
         all_indices = np.where([self.caption_lengths[i] >= self.sel_length-2 and self.caption_lengths[i] <= self.sel_length+2 for i in np.arange(len(self.caption_lengths))])[0]
         # select batch_size indexes of the chosen lenght
+        import pdb
+        pdb.set_trace()
         indices = list(np.random.choice(all_indices, size=self.batch_size))
         return indices #, sel_length + 1
 
