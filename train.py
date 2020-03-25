@@ -59,8 +59,8 @@ if __name__  == "__main__":
 
 
     embed_size=512
-    if args.batchsize:
-        batch_size = args.batchsize
+    if args.batch_size:
+        batch_size = args.batch_size
     else:
         batch_size = 512
     if args.num_layers:
