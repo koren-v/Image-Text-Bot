@@ -18,7 +18,6 @@ def get_loader(transform,
                start_word="<start>",
                end_word="<end>",
                unk_word="<unk>",
-               pad_token="<pad>",
                vocab_from_file=True,
                num_workers=0):
     """Returns the data loader.
@@ -65,7 +64,6 @@ def get_loader(transform,
                           start_word=start_word,
                           end_word=end_word,
                           unk_word=unk_word,
-                          pad_token=pad_token,
                           annotations_file=annotations_file,
                           vocab_from_file=vocab_from_file,
                           img_folder=img_folder)
@@ -103,12 +101,12 @@ def get_loader(transform,
 class CoCoDataset(data.Dataset):
     
     def __init__(self, transform, mode, batch_size, vocab_threshold, vocab_file, start_word, 
-        end_word, unk_word, pad_token, annotations_file, vocab_from_file, img_folder):
+        end_word, unk_word, annotations_file, vocab_from_file, img_folder):
         self.transform = transform
         self.mode = mode
         self.batch_size = batch_size
         self.vocab = Vocabulary(vocab_threshold, vocab_file, start_word,
-            end_word, unk_word, pad_token, annotations_file, vocab_from_file)
+            end_word, unk_word, annotations_file, vocab_from_file)
         self.img_folder = img_folder
         self.sel_length = None
 
@@ -152,7 +150,7 @@ class CoCoDataset(data.Dataset):
             caption.append(self.vocab(self.vocab.end_word))
             
             mask = [False for _ in range(len(caption))] + [True for _ in range(self.sel_length+2 - len(caption))]
-            caption += [3 for _ in range(self.sel_length+2 - len(caption))] # якщо раптом треба буде падити
+            #caption += [3 for _ in range(self.sel_length+2 - len(caption))] # якщо раптом треба буде падити
 
             caption = torch.Tensor(caption).long()
             # return pre-processed image and caption tensors
@@ -172,14 +170,11 @@ class CoCoDataset(data.Dataset):
     def get_train_indices(self):
         """In this way we get captures in batch with the same length"""
         # choose some length from all caption's lengths
-        self.sel_length = np.random.choice(self.caption_lengths)
+        sel_length = np.random.choice(self.caption_lengths)
         # select their indexes
-
-        # all_indices = np.where([self.caption_lengths[i] == sel_length for i in np.arange(len(self.caption_lengths))])[0]
-        all_indices = np.where([self.caption_lengths[i] >= self.sel_length-2 and self.caption_lengths[i] <= self.sel_length+2 for i in np.arange(len(self.caption_lengths))])[0]
+        all_indices = np.where([self.caption_lengths[i] == sel_length for i in np.arange(len(self.caption_lengths))])[0]
+        # all_indices = np.where([self.caption_lengths[i] >= self.sel_length-2 and self.caption_lengths[i] <= self.sel_length+2 for i in np.arange(len(self.caption_lengths))])[0]
         # select batch_size indexes of the chosen lenght
-        import pdb
-        pdb.set_trace()
         indices = list(np.random.choice(all_indices, size=self.batch_size))
         return indices #, sel_length + 1
 

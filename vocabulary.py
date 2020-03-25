@@ -12,7 +12,6 @@ class Vocabulary(object):
         start_word="<start>",
         end_word="<end>",
         unk_word="<unk>",
-        pad_token = "<pad>",
         annotations_file='./cocoapi/annotations/captions_train2014.json',
         vocab_from_file=False):
         """Initialize the vocabulary.
@@ -31,7 +30,6 @@ class Vocabulary(object):
         self.start_word = start_word
         self.end_word = end_word
         self.unk_word = unk_word
-        self.pad_token = pad_token
         self.annotations_file = annotations_file
         self.vocab_from_file = vocab_from_file
         self.get_vocab()
@@ -55,7 +53,6 @@ class Vocabulary(object):
         self.add_word(self.start_word)
         self.add_word(self.end_word)
         self.add_word(self.unk_word)
-        self.add_word(self.pad_token)
         self.add_captions()
 
     def init_vocab(self):
