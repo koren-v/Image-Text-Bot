@@ -180,7 +180,7 @@ if __name__  == "__main__":
             features = encoder(images)
             features = features.to(device)
 
-            captions_inp, captions_out = captions[:, :-1], captions[:, 1:].contiguous()
+            captions_inp, captions_out = captions[:, :-1], captions[:, 1:]
 
             tgt_mask = gen_nopeek_mask(captions_inp.shape[1])
             tgt_mask = tgt_mask.to(device)
@@ -224,9 +224,13 @@ if __name__  == "__main__":
                     captions = captions.to(device)
 <<<<<<< HEAD
                     tgt_key_padding_mask = tgt_key_padding_mask.to(device)
+<<<<<<< HEAD
 =======
 >>>>>>> parent of e7c3925... mask to device
 
+=======
+                    
+>>>>>>> parent of 97372b5... added .copy() to train and randomness
                     features = encoder(images)
                     features = features.to(device)
 

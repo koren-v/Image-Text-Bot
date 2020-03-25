@@ -150,7 +150,7 @@ class CoCoDataset(data.Dataset):
             caption.append(self.vocab(self.vocab.end_word))
             
             mask = [False for _ in range(len(caption))] # + [True for _ in range(self.sel_length+1 - len(caption))]
-            caption += [0 for _ in range(self.sel_length+2 - len(caption))] # якщо раптом треба буде падити
+            # caption+=[0 for _ in range(self.sel_length+1 - len(caption))] # якщо раптом треба буде падити
 
             caption = torch.Tensor(caption).long()
             # return pre-processed image and caption tensors
@@ -170,10 +170,10 @@ class CoCoDataset(data.Dataset):
     def get_train_indices(self):
         """In this way we get captures in batch with the same length"""
         # choose some length from all caption's lengths
-        self.sel_length = np.random.choice(self.caption_lengths)
+        sel_length = np.random.choice(self.caption_lengths)
         # select their indexes
-        # all_indices = np.where([self.caption_lengths[i] == sel_length for i in np.arange(len(self.caption_lengths))])[0]
-        all_indices = np.where([self.caption_lengths[i] >= sel_length-2 or self.caption_lengths[i] <= sel_length+2 for i in np.arange(len(self.caption_lengths))])[0]
+        all_indices = np.where([self.caption_lengths[i] == sel_length for i in np.arange(len(self.caption_lengths))])[0]
+        # all_indices = np.where([self.caption_lengths[i] >= sel_length-1 or self.caption_lengths[i] <= sel_length+1 for i in np.arange(len(self.caption_lengths))])[0]
         # select batch_size indexes of the chosen lenght
         indices = list(np.random.choice(all_indices, size=self.batch_size))
         return indices #, sel_length + 1
