@@ -173,7 +173,7 @@ class CoCoDataset(data.Dataset):
         self.sel_length = np.random.choice(self.caption_lengths)
         # select their indexes
         # all_indices = np.where([self.caption_lengths[i] == sel_length for i in np.arange(len(self.caption_lengths))])[0]
-        all_indices = np.where([self.caption_lengths[i] >= self.sel_length-2 or self.caption_lengths[i] <= self.sel_length+2 for i in np.arange(len(self.caption_lengths))])[0]
+        all_indices = np.where([self.caption_lengths[i] >= sel_length-2 or self.caption_lengths[i] <= sel_length+2 for i in np.arange(len(self.caption_lengths))])[0]
         # select batch_size indexes of the chosen lenght
         indices = list(np.random.choice(all_indices, size=self.batch_size))
         return indices #, sel_length + 1
