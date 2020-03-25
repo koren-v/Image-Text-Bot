@@ -222,7 +222,10 @@ if __name__  == "__main__":
 
                     images = images.to(device)
                     captions = captions.to(device)
+<<<<<<< HEAD
                     tgt_key_padding_mask = tgt_key_padding_mask.to(device)
+=======
+>>>>>>> parent of e7c3925... mask to device
 
                     features = encoder(images)
                     features = features.to(device)
