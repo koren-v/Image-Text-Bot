@@ -222,15 +222,8 @@ if __name__  == "__main__":
 
                     images = images.to(device)
                     captions = captions.to(device)
-<<<<<<< HEAD
                     tgt_key_padding_mask = tgt_key_padding_mask.to(device)
-<<<<<<< HEAD
-=======
->>>>>>> parent of e7c3925... mask to device
 
-=======
-                    
->>>>>>> parent of 97372b5... added .copy() to train and randomness
                     features = encoder(images)
                     features = features.to(device)
 
