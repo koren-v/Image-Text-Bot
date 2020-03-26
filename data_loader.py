@@ -148,13 +148,10 @@ class CoCoDataset(data.Dataset):
             caption.append(self.vocab(self.vocab.start_word))
             caption.extend([self.vocab(token) for token in tokens])
             caption.append(self.vocab(self.vocab.end_word))
-            
-            mask = [False for _ in range(len(caption))] # + [True for _ in range(self.sel_length+1 - len(caption))]
-            # caption+=[0 for _ in range(self.sel_length+1 - len(caption))] # якщо раптом треба буде падити
-
             caption = torch.Tensor(caption).long()
+
             # return pre-processed image and caption tensors
-            return image, caption, np.array(mask)
+            return image, caption
         
         # obtain image if in test mode
         else:

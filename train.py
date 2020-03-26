@@ -16,7 +16,7 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 
-from model import EncoderCNN, DecoderRNN, LanguageTransformer
+from model import EncoderCNN, DecoderRNN
 
 
 # Define a transform to pre-process the training images.
@@ -27,13 +27,6 @@ transform_train = transforms.Compose([
     transforms.ToTensor(),                           # convert the PIL Image to a tensor
     transforms.Normalize((0.485, 0.456, 0.406),      # normalize image for pre-trained model
                          (0.229, 0.224, 0.225))])
-
-
-def gen_nopeek_mask(length):
-    mask = torch.triu(torch.ones(length, length)).permute(1, 0)
-    mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
-
-    return mask
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -70,7 +63,7 @@ if __name__  == "__main__":
 
     vocab_threshold = 3
     vocab_from_file = args.vocab_from_file
-    #hidden_size = 1024
+    hidden_size = 1024
 
     train_data_loader = get_loader(transform=transform_train,
                                 mode='train',
@@ -92,12 +85,9 @@ if __name__  == "__main__":
     encoder=EncoderCNN(embed_size, cnn)
     encoder=encoder.to(device)
 
-    # decoder=DecoderRNN(embed_size=512, hidden_size=768 , vocab_size=vocab_size, num_layers=num_layers)
-    # decoder=decoder.to(device)
+    decoder=DecoderRNN(embed_size=512, hidden_size=768 , vocab_size=vocab_size, num_layers=num_layers)
+    decoder=decoder.to(device)
 
-    decoder = LanguageTransformer(vocab_size = vocab_size, embedding_size = 512, nhead = 8, num_encoder_layers = 6,
-                                num_decoder_layers = 6, dim_feedforward = 2048, max_seq_length = 100,
-                                pos_dropout = 0.1, trans_dropout = 0.1)
 
     decoder=decoder.to(device)
 
@@ -165,14 +155,13 @@ if __name__  == "__main__":
             train_data_loader.batch_sampler.sampler = new_sampler
 
             try:
-                images, captions, tgt_key_padding_mask = next(iter(train_data_loader))
+                images, captions = next(iter(train_data_loader))
             except:
                 batches_skiped+=1
                 continue
 
             images = images.to(device)
             captions = captions.to(device)
-            tgt_key_padding_mask = tgt_key_padding_mask.to(device)
 
             decoder.zero_grad()
             encoder.zero_grad()
@@ -180,15 +169,11 @@ if __name__  == "__main__":
             features = encoder(images)
             features = features.to(device)
 
-            captions_inp, captions_out = captions[:, :-1], captions[:, 1:].contiguous()
 
-            tgt_mask = gen_nopeek_mask(captions_inp.shape[1])
-            tgt_mask = tgt_mask.to(device)
-
-            outputs = decoder(features, captions_inp, tgt_key_padding_mask[:, :-1], tgt_mask)
+            outputs = decoder(features, captions)
             outputs = outputs.to(device)
 
-            loss = criterion(outputs.view(-1, vocab_size), captions_out.reshape(-1))
+            loss = criterion(outputs.view(-1, vocab_size), captions.view(-1))
             loss.backward()
             optimizer.step()
 
@@ -216,26 +201,20 @@ if __name__  == "__main__":
                     val_data_loader.batch_sampler.sampler = new_sampler
 
                     try:
-                        images, captions, tgt_key_padding_mask = next(iter(train_data_loader))
+                        images, captions = next(iter(train_data_loader))
                     except:
                         continue
 
                     images = images.to(device)
                     captions = captions.to(device)
-                    tgt_key_padding_mask = tgt_key_padding_mask.to(device)
 
                     features = encoder(images)
                     features = features.to(device)
 
-                    captions_inp, captions_out = captions[:, :-1], captions[:, 1:].contiguous()
-
-                    tgt_mask = gen_nopeek_mask(captions_inp.shape[1])
-                    tgt_mask = tgt_mask.to(device)
-
-                    outputs = decoder(features, captions_inp, tgt_key_padding_mask[:, :-1], tgt_mask)
+                    outputs = decoder(features, captions)
                     outputs = outputs.to(device)
 
-                    loss = criterion(outputs.view(-1, vocab_size), captions_out.reshape(-1))
+                    loss = criterion(outputs.view(-1, vocab_size), captions.view(-1))
                     eval_running_loss += loss.item() * outputs.size(0) #I added this part =)
                     stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f' % (epoch, num_epochs, i_step, total_val_step, loss.item())
                     print('\r' + stats, end="")
