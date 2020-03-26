@@ -44,6 +44,7 @@ if __name__  == "__main__":
     parser.add_argument("--cnn")
     parser.add_argument("-val", "--make_validation", action="store_true")
     parser.add_argument("--vocab_from_file", action="store_true")
+    parser.add_argument("--hidden_size", type=int)
     parser.add_argument("--load_model", action="store_true")
     parser.add_argument("--unfreeze_encoder", action="store_true")
     parser.add_argument("--num_layers", type=int)
@@ -63,7 +64,11 @@ if __name__  == "__main__":
 
     vocab_threshold = 3
     vocab_from_file = args.vocab_from_file
-    hidden_size = 1024
+    
+    if args.hidden_size:
+        hidden_size = args.hidden_size
+    else:
+        hidden_size = 1024
 
     train_data_loader = get_loader(transform=transform_train,
                                 mode='train',
