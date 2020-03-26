@@ -46,7 +46,7 @@ if __name__  == "__main__":
     parser.add_argument("--vocab_from_file", action="store_true")
     parser.add_argument("--hidden_size", type=int)
     parser.add_argument("--load_model", action="store_true")
-    parser.add_argument("--unfreeze_encoder", action="store_true")
+    parser.add_argument("--unfreeze_encoder", type=int)
     parser.add_argument("--num_layers", type=int)
     parser.add_argument("-bs", "--batchsize", type=int)
     args = parser.parse_args()
@@ -64,7 +64,7 @@ if __name__  == "__main__":
 
     vocab_threshold = 3
     vocab_from_file = args.vocab_from_file
-    
+
     if args.hidden_size:
         hidden_size = args.hidden_size
     else:
@@ -116,8 +116,12 @@ if __name__  == "__main__":
     criterion = nn.CrossEntropyLoss()
 
     if args.unfreeze_encoder:
-        encoder.unfreeze_encoder()
-        encoder_params = encoder.parameters()
+        encoder.unfreeze_encoder(args.unfreeze_encoder)
+        encoder_params = []
+        for name,param in encoder.named_parameters():
+            if param.requires_grad == True:
+                encoder_params.append(param)
+                print("\t",name)
     else:
         encoder_params = list(encoder.linear.parameters()) + list(encoder.bn1.parameters())
 

@@ -20,7 +20,10 @@ class EncoderCNN(nn.Module):
         
         modules = list(encoder.children())[:-1]        
         self.encoder = nn.Sequential(*modules)
-        self.linear = nn.Linear(encoder.fc.in_features, embed_size)        
+        if cnn == 'resnet101':
+            self.linear = nn.Linear(encoder.fc.in_features, embed_size)
+        elif cnn == 'vgg19':
+            self.linear = nn.Linear(encoder.classifier[6].in_features, embed_size)
         self.bn1 = nn.BatchNorm1d(embed_size)        
         
     def forward(self, images):
@@ -30,6 +33,17 @@ class EncoderCNN(nn.Module):
         features = self.bn1(features)
         
         return features
+
+
+    def freeze_encoder(self):
+        for param in self.encoder.parameters():
+            param.requires_grad = False
+    
+    def unfreeze_encoder(self, num_freezed):
+        for l, child in enumerate(self.encoder.children()):
+            if l > num_freezed:
+                for param in child.parameters():
+                  param.requires_grad = True
 
 class DecoderRNN(nn.Module):
     def __init__(self, embed_size, hidden_size, vocab_size, num_layers=1):
