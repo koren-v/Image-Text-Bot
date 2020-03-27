@@ -18,6 +18,12 @@ import torchvision.models as models
 
 from model import EncoderCNN, DecoderRNN
 
+def create_table(stage, train_list, valid_list):
+    statistic ='-'*18+'\n'+' '*3+stage+'\n'+'-'*18
+    for train_loss, val_loss in zip(train_list, valid_list):
+        statistic += '\n| %.3f  |  %.3f |' % (train_loss, val_loss)
+    return statistic
+
 
 # Define a transform to pre-process the training images.
 transform_train = transforms.Compose([ 
@@ -157,6 +163,8 @@ if __name__  == "__main__":
 
         train_running_loss = 0.0
         eval_running_loss = 0.0
+        train_list = []
+        valid_list = []
         batches_skiped = 0
 
         for i_step in range(1, total_step+1):
@@ -251,4 +259,10 @@ if __name__  == "__main__":
 
         print('\nTrain loss: ', train_epoch_loss)
         print('Eval loss: ', eval_epoch_loss)
+        train_list.append(train_epoch_loss)
+        valid_list.append(eval_epoch_loss)
         print('Batches skipped during training: ', batches_skiped)
+
+
+    stat = create_table(stage, train_list, valid_list)
+    print(stat)
