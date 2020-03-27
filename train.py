@@ -98,7 +98,8 @@ if __name__  == "__main__":
 
 
     if args.load_model:
-        name = input('Type name of encoder/decoder')   
+        name = input('Type name of encoder/decoder')
+        last_epoch = int(name[1])  
         if torch.cuda.is_available():
             encoder.load_state_dict(torch.load('./models/encoder'+name+'.pth'))
             decoder.load_state_dict(torch.load('./models/decoder'+name+'.pth'))
@@ -107,6 +108,8 @@ if __name__  == "__main__":
                                             map_location=torch.device('cpu')))
             decoder.load_state_dict(torch.load('./models/encoder'+name+'.pth', 
                                             map_location=torch.device('cpu')))
+
+    
 
     num_epochs = args.num_epochs           
     save_every = 1
@@ -236,12 +239,12 @@ if __name__  == "__main__":
 
         if epoch % save_every == 0:
             torch.save(decoder.state_dict(),
-                        os.path.join('./models', 'decoder_%d_%.2f_v_%.2f_t_%s.pth' % (epoch, 
+                        os.path.join('./models', 'decoder_%d_%.2f_v_%.2f_t_%s.pth' % (epoch + last_epoch if args.load_model else epoch, 
                                                                                         eval_epoch_loss,
                                                                                         train_epoch_loss, 
                                                                                         stage)))
             torch.save(encoder.state_dict(),
-                        os.path.join('./models', 'encoder_%d_%.2f_v_%.2f_t_%s.pth' % (epoch, 
+                        os.path.join('./models', 'encoder_%d_%.2f_v_%.2f_t_%s.pth' % (epoch + last_epoch if args.load_model else epoch, 
                                                                                         eval_epoch_loss, 
                                                                                         train_epoch_loss, 
                                                                                         stage)))
