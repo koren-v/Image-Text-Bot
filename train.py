@@ -48,7 +48,7 @@ if __name__  == "__main__":
     parser.add_argument("--encoder_lr", type=float)
     parser.add_argument("--decoder_lr", type=float)
     parser.add_argument("--stage")
-    parser.add_argument("--cnn")
+    #parser.add_argument("--cnn")
     parser.add_argument("-val", "--make_validation", action="store_true")
     parser.add_argument("--vocab_from_file", action="store_true")
     parser.add_argument("--load_model", action="store_true")
@@ -85,11 +85,11 @@ if __name__  == "__main__":
 
     vocab_size = len(train_data_loader.dataset.vocab)
 
-    if args.cnn:
-        cnn = args.cnn
-    else:
-        cnn = 'resnet101'
-    encoder=EncoderCNN(embed_size, cnn)
+    # if args.cnn:
+    #     cnn = args.cnn
+    # else:
+    #     cnn = 'resnet101'
+    encoder=EncoderCNN()
     encoder=encoder.to(device)
 
     # decoder=DecoderRNN(embed_size=512, hidden_size=768 , vocab_size=vocab_size, num_layers=num_layers)
@@ -124,19 +124,20 @@ if __name__  == "__main__":
         encoder.unfreeze_encoder()
         encoder_params = encoder.parameters()
     else:
-        encoder_params = list(encoder.linear.parameters()) + list(encoder.bn1.parameters())
+        pass
+        #encoder_params = list(encoder.linear.parameters()) + list(encoder.bn1.parameters())
 
-    decoder_lr = args.decoder_lr
-    encoder_lr = args.encoder_lr
+    # decoder_lr = args.decoder_lr
+    # encoder_lr = args.encoder_lr
 
-    optimizer = torch.optim.Adam(
-        [
-            {"params":decoder.parameters(),"lr": decoder_lr},
-            {"params":encoder_params, "lr": encoder_lr},
+    # optimizer = torch.optim.Adam(
+    #     [
+    #         {"params":decoder.parameters(),"lr": decoder_lr},
+    #         {"params":encoder_params, "lr": encoder_lr},
         
-    ])
+    # ])
 
-    #optimizer = torch.optim.Adam(params,lr=learning_rate)
+    optimizer = torch.optim.Adam(decoder.parameters(),lr=args.decoder_lr)
     
     total_step = math.ceil(len(train_data_loader.dataset.caption_lengths) / train_data_loader.batch_sampler.batch_size)
     total_val_step = math.ceil(len(val_data_loader.dataset.caption_lengths) / val_data_loader.batch_sampler.batch_size)

@@ -41,13 +41,13 @@ def get_loader(transform,
     # Based on mode (train, val, test), obtain img_folder and annotations_file.
     if mode == 'train':
         if vocab_from_file==True: assert os.path.exists(vocab_file), "vocab_file does not exist.  Change vocab_from_file to False to create vocab_file."
-        img_folder = './train2014/train2014/'
-        annotations_file = './captions/annotations/captions_train2014.json'
+        img_folder = 'coco2014/train2014/train2014/'
+        annotations_file = 'coco2014/captions/annotations/captions_train2014.json'
     # validation
     if mode == 'val':
         if vocab_from_file==True: assert os.path.exists(vocab_file), "vocab_file does not exist.  Change vocab_from_file to False to create vocab_file."
-        img_folder = './val2014/val2014/'
-        annotations_file = './captions/annotations/captions_val2014.json'  
+        img_folder = 'coco2014/val2014/val2014/'
+        annotations_file = 'coco2014/captions/annotations/captions_val2014.json'  
 
     if mode == 'test':
         assert batch_size==1, "Please change batch_size to 1 if testing your model."
