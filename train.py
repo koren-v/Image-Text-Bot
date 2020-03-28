@@ -3,7 +3,7 @@ import sys
 import argparse
 
 import nltk
-
+from nltk.translate.bleu_score import sentence_bleu
 from data_loader import get_loader
 from torchvision import transforms
 
@@ -74,7 +74,7 @@ if __name__  == "__main__":
     if args.hidden_size:
         hidden_size = args.hidden_size
     else:
-        hidden_size = 1024
+        hidden_size = 768
 
     train_data_loader = get_loader(transform=transform_train,
                                 mode='train',
@@ -96,7 +96,7 @@ if __name__  == "__main__":
     encoder=EncoderCNN(embed_size, cnn)
     encoder=encoder.to(device)
 
-    decoder=DecoderRNN(embed_size=512, hidden_size=768 , vocab_size=vocab_size, num_layers=num_layers)
+    decoder=DecoderRNN(embed_size=512, hidden_size=hidden_size , vocab_size=vocab_size, num_layers=num_layers)
     decoder=decoder.to(device)
 
 
@@ -166,6 +166,8 @@ if __name__  == "__main__":
         train_list = []
         valid_list = []
         batches_skiped = 0
+        train_bleu = 0.0
+        eval_bleu = 0.0
 
         for i_step in range(1, total_step+1):
             
@@ -189,7 +191,6 @@ if __name__  == "__main__":
             features = encoder(images)
             features = features.to(device)
 
-
             outputs = decoder(features, captions)
             outputs = outputs.to(device)
 
@@ -199,7 +200,9 @@ if __name__  == "__main__":
 
             # metrics
             train_running_loss += loss.item() * outputs.size(0) #I added this part =)
-            stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f' % (epoch, num_epochs, i_step, total_step, loss.item())
+            bleu4 = sentence_bleu([captions.view(-1)], torch.argmax(outputs.view(-1, vocab_size), axis=1))
+            train_bleu += bleu4
+            stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f, BLEU-4: %.4f' % (epoch, num_epochs, i_step, total_step, loss.item(), bleu4)
             
             print('\r' + stats, end="")
             sys.stdout.flush()
@@ -236,7 +239,10 @@ if __name__  == "__main__":
 
                     loss = criterion(outputs.view(-1, vocab_size), captions.view(-1))
                     eval_running_loss += loss.item() * outputs.size(0) #I added this part =)
-                    stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f' % (epoch, num_epochs, i_step, total_val_step, loss.item())
+
+                    bleu4 = sentence_bleu([captions.view(-1)], torch.argmax(outputs.view(-1, vocab_size), axis=1))
+                    eval_bleu += bleu4
+                    stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f, BLEU-4: %.4f' % (epoch, num_epochs, i_step, total_val_step, loss.item(), bleu4)
                     print('\r' + stats, end="")
                     sys.stdout.flush()
                     if i_step % print_every == 0:
@@ -244,6 +250,8 @@ if __name__  == "__main__":
 
         train_epoch_loss = train_running_loss / len(train_data_loader.dataset.caption_lengths)
         eval_epoch_loss = eval_running_loss / len(val_data_loader.dataset.caption_lengths)
+        train_epoch_bleu = train_bleu / len(train_data_loader.dataset.caption_lengths)
+        eval_epoch_bleu = eval_bleu / len(train_data_loader.dataset.caption_lengths)
 
         if epoch % save_every == 0:
             torch.save(decoder.state_dict(),
@@ -259,6 +267,8 @@ if __name__  == "__main__":
 
         print('\nTrain loss: ', train_epoch_loss)
         print('Eval loss: ', eval_epoch_loss)
+        print('Train loss: ', train_epoch_bleu)
+        print('Eval loss: ', eval_epoch_bleu)
         train_list.append(train_epoch_loss)
         valid_list.append(eval_epoch_loss)
         print('Batches skipped during training: ', batches_skiped)
