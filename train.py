@@ -159,12 +159,12 @@ if __name__  == "__main__":
         stage = 'default_stage'
 
 
+    train_list = []
+    valid_list = []
     for epoch in range(1, num_epochs+1):
 
         train_running_loss = 0.0
         eval_running_loss = 0.0
-        train_list = []
-        valid_list = []
         batches_skiped = 0
         train_bleu = 0.0
         eval_bleu = 0.0
