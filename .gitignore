@@ -3,3 +3,6 @@
 /.vscode/
 vocab.pkl
 /__pycache__/
+train2014
+val2014
+captions
