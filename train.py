@@ -200,7 +200,7 @@ if __name__  == "__main__":
 
             # metrics
             train_running_loss += loss.item() * outputs.size(0) #I added this part =)
-            bleu4 = sentence_bleu([captions.view(-1)], torch.argmax(outputs.view(-1, vocab_size), axis=1))
+            bleu4 = sentence_bleu([captions.view(-1).tolist()], torch.argmax(outputs.view(-1, vocab_size), axis=1).tolist())
             train_bleu += bleu4
             stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f, BLEU-4: %.4f' % (epoch, num_epochs, i_step, total_step, loss.item(), bleu4)
             
@@ -240,7 +240,7 @@ if __name__  == "__main__":
                     loss = criterion(outputs.view(-1, vocab_size), captions.view(-1))
                     eval_running_loss += loss.item() * outputs.size(0) #I added this part =)
 
-                    bleu4 = sentence_bleu([captions.view(-1)], torch.argmax(outputs.view(-1, vocab_size), axis=1))
+                    bleu4 = sentence_bleu([captions.view(-1).tolist()], torch.argmax(outputs.view(-1, vocab_size), axis=1).tolist())
                     eval_bleu += bleu4
                     stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f, BLEU-4: %.4f' % (epoch, num_epochs, i_step, total_val_step, loss.item(), bleu4)
                     print('\r' + stats, end="")
