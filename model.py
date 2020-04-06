@@ -20,8 +20,9 @@ class EncoderCNN(nn.Module):
         
     def forward(self, images):
         features = self.encoder(images)
-        import pdb
-        pdb.set_trace()
+        batch_size = features.shape[0]
+        features_depth = features.shape[1]
+        features = features.reshape(batch_size, features_depth, -1)
         return features
 
 
