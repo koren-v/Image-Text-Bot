@@ -11,18 +11,18 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class EncoderCNN(nn.Module):
     def __init__(self):
         super(EncoderCNN, self).__init__()
-        encoder=models.wide_resnet50_2(pretrained=True)
+        encoder=models.wide_resnet101_2(pretrained=True)
         for param in encoder.parameters():
             param.requires_grad_(False)
         
-        modules = list(encoder.children())[:-2]        
+        modules = list(encoder.children())[:-4]        
         self.encoder = nn.Sequential(*modules)        
         
     def forward(self, images):
         features = self.encoder(images)
         batch_size = features.shape[0]
         features_depth = features.shape[1]
-        features = features.reshape(batch_size, features_depth, -1)
+        features = features.reshape(batch_size, features_depth, -1) # [bs, 512, 784]
         return features
 
 

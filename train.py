@@ -232,7 +232,10 @@ if __name__  == "__main__":
 
                     tgt_mask = gen_nopeek_mask(captions_inp.shape[1])
                     tgt_mask = tgt_mask.to(device)
-
+                    
+                    import pdb
+                    pdb.set_trace()
+                    
                     outputs = decoder(features, captions_inp, tgt_key_padding_mask[:, :-1], tgt_mask)
                     outputs = outputs.to(device)
 
