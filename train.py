@@ -15,8 +15,8 @@ import torch.utils.data as data
 import torch
 import torch.nn as nn
 import torchvision.models as models
-from transformers import AdamW #,get_linear_schedule_with_warmup
-from transformers import WarmupLinearSchedule as get_linear_schedule_with_warmup
+from transformers import AdamW, get_linear_schedule_with_warmup
+#from transformers import WarmupLinearSchedule as get_linear_schedule_with_warmup
 
 from model import EncoderCNN, DecoderRNN, LanguageTransformer
 from train_utils import *
