@@ -129,15 +129,17 @@ if __name__  == "__main__":
                 {"params":encoder_params, "lr": encoder_lr},
             ])
         scheduler = None
+        grad_acumulation_step = None
     else:
         optimizer = AdamW([
                 {"params":decoder.parameters(),"lr": decoder_lr},
                 {"params":encoder_params, "lr": encoder_lr},
                         ])
 
+        grad_acumulation_step = 16
         num_epoch_steps = math.ceil(len(train_data_loader.dataset.caption_lengths) \
                                     / train_data_loader.batch_sampler.batch_size)
-        num_training_steps = num_epoch_steps*num_epochs
+        num_training_steps = num_epoch_steps*num_epochs / grad_acumulation_step
 
         num_warmup_steps = 250
         scheduler = get_linear_schedule_with_warmup(optimizer,
@@ -160,4 +162,5 @@ if __name__  == "__main__":
     print('Start Training!')
 
     fit(model, criterion, optimizer, dataloader_dict,
-        num_epochs, device, stage, hyper_params, scheduler = scheduler, last_epoch=last_epoch)
+        num_epochs, device, stage, hyper_params, 
+        scheduler = scheduler, last_epoch=last_epoch, grad_acumulation_step = grad_acumulation_step)

@@ -31,7 +31,7 @@ def gen_nopeek_mask(length):
     return mask
 
 def epoch(model, phase, device, criterion, optimizer, 
-          data_loader, tb, scheduler=None):
+          data_loader, tb, grad_acumulation_step, scheduler=None):
 
     encoder = model['encoder']
     decoder = model['decoder']
@@ -53,6 +53,7 @@ def epoch(model, phase, device, criterion, optimizer,
     total_steps = math.ceil(len(data_loader.dataset.caption_lengths)\
                              / data_loader.batch_sampler.batch_size)
 
+    optimizer.zero_grad()
     for step in range(total_steps):
         
         indices = data_loader.dataset.get_train_indices()        
@@ -69,7 +70,6 @@ def epoch(model, phase, device, criterion, optimizer,
         captions = captions.to(device)
         tgt_key_padding_mask = tgt_key_padding_mask.to(device)
 
-        optimizer.zero_grad()
         with torch.set_grad_enabled(phase == 'train'):
 
             features = encoder(images)
@@ -86,8 +86,10 @@ def epoch(model, phase, device, criterion, optimizer,
 
             if phase == 'train':
                 loss.backward()
-                optimizer.step()
-                if scheduler: scheduler.step()
+                if (step+1)%grad_acumulation_step == 0:    
+                    optimizer.step()
+                    if scheduler: scheduler.step()
+                    optimizer.zero_grad()
 
         running_loss += loss.item() * features.size(0)
         bleu4 = compute_metric(captions_out, outputs)
@@ -111,7 +113,7 @@ def epoch(model, phase, device, criterion, optimizer,
     return epoch_dict
 
 def fit(model, criterion, optimizer, dataloader_dict,
-        num_epochs, device, stage, hyper_params, scheduler=None, last_epoch=None):
+        num_epochs, device, stage, hyper_params, scheduler=None, last_epoch=None, grad_acumulation_step = 1):
 
     tb = SummaryWriter(comment=stage)
     # tb.add_graph(model['encoder'])
@@ -128,7 +130,9 @@ def fit(model, criterion, optimizer, dataloader_dict,
         for phase in ['train', 'val']:
 
             epoch_dict = epoch(model, phase, device, criterion, optimizer, 
-                               dataloader_dict[phase], tb, scheduler=scheduler)
+                               dataloader_dict[phase], tb, 
+                               grad_acumulation_step = grad_acumulation_step, 
+                               scheduler=scheduler)
             
             print('\n{} epoch loss: {:.4f} '.format(phase , epoch_dict['epoch_loss']))
             print('{} epoch metric: {:.4f} '.format(phase , epoch_dict['epoch_bleu']))
