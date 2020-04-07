@@ -39,6 +39,7 @@ def epoch(model, phase, device, criterion, optimizer,
         decoder.eval()
 
     running_loss = 0.0
+    running_bleu = 0.0
     batches_skiped = 0
     targets = np.array([])
     raw_preds = np.array([])
@@ -78,6 +79,7 @@ def epoch(model, phase, device, criterion, optimizer,
 
         running_loss += loss.item() * features.size(0)
         bleu4 = compute_metric(captions, outputs)
+        running_bleu+=bleu4
 
         stats = 'Step [{}/{}], Loss: {:.4f}, BLEU-4: {:.4f}'.format(step, total_steps, loss.item(), bleu4)
 
@@ -88,7 +90,7 @@ def epoch(model, phase, device, criterion, optimizer,
         tb.add_scalar('{} Batch BLEU'.format(phase.title()), bleu4, step)
     
     epoch_loss = running_loss / len(data_loader.dataset.caption_lengths) #len of the data
-    epoch_bleu = bleu4 / total_steps
+    epoch_bleu = running_bleu / total_steps
     epoch_dict = {'batches_skiped':batches_skiped,
                   'epoch_loss': epoch_loss, 
                   'epoch_bleu': epoch_bleu,
@@ -116,7 +118,7 @@ def fit(model, criterion, optimizer, dataloader_dict,
             epoch_dict = epoch(model, phase, device, criterion, optimizer, 
                                dataloader_dict[phase], tb, scheduler=scheduler)
             
-            print('{} epoch loss: {:.4f} '.format(phase , epoch_dict['epoch_loss']))
+            print('\n{} epoch loss: {:.4f} '.format(phase , epoch_dict['epoch_loss']))
             print('{} epoch metric: {:.4f} '.format(phase , epoch_dict['epoch_bleu']))
 
             tb.add_scalar('{} Epoch Loss'.format(phase.title()), epoch_dict['epoch_loss'], i)
@@ -130,16 +132,15 @@ def fit(model, criterion, optimizer, dataloader_dict,
                 valid_loss.append(epoch_dict['epoch_loss'])
                 valid_bleu.append(epoch_dict['epoch_bleu'])
 
-            model_name = '{}_{:.2f}_val_{:.2f}_tr_{}.pth'.format(i+last_epoch if last_epoch else i,
-                                                                 valid_loss[-1],
-                                                                 train_loss[-1],
-                                                                 stage)
-
-            torch.save(epoch_dict['decoder'].state_dict(),
-                        os.path.join('./models', 'decoder'+model_name))
-            torch.save(epoch_dict['encoder'].state_dict(),
-                        os.path.join('./models', 'encoder'+model_name))
-            
+                model_name = '{}_{:.2f}_val_{:.2f}_tr_{}.pth'.format(i+last_epoch if last_epoch else i,
+                                                                    valid_loss[-1],
+                                                                    train_loss[-1],
+                                                                    stage)
+                torch.save(epoch_dict['decoder'].state_dict(),
+                            os.path.join('./models', 'decoder'+model_name))
+                torch.save(epoch_dict['encoder'].state_dict(),
+                            os.path.join('./models', 'encoder'+model_name))
+                
 
             # not implemented loading best model weights callback
             # if phase == 'val' and best_loss>epoch_dict['epoch_loss']:
