@@ -22,7 +22,7 @@ class EncoderCNN(nn.Module):
         features = self.encoder(images)
         batch_size = features.shape[0]
         features_depth = features.shape[1]
-        features = features.reshape(batch_size, features_depth, -1) # [bs, 512, 784]
+        features = features.reshape(features_depth, batch_size, -1) # [bs, 512, 784]
         return features
 
 
@@ -207,7 +207,7 @@ class LanguageTransformer(nn.Module):
     def forward(self, src, tgt, tgt_key_padding_mask, tgt_mask):
         # src = rearrange(src, 'n s -> s n')
         # tgt = rearrange(tgt, 'n t -> t n')
-        src = src.unsqueeze(0)  # [1, batch_size, embed_size]
+        # src = src.unsqueeze(0)  # [1, batch_size, embed_size]
         tgt = tgt.permute(1, 0) # [len_of_capture, batch_size, embed_size]
 
         # src = self.pos_enc(self.embed_src(src) * math.sqrt(self.embedding_size)) 
