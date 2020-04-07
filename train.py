@@ -96,7 +96,7 @@ if __name__  == "__main__":
     encoder_lr = args.encoder_lr
     stage = args.stage
     last_epoch = None
-    
+
     if args.unfreeze_encoder:
         encoder.unfreeze_encoder(args.unfreeze_encoder)
         encoder_params = []
@@ -116,6 +116,14 @@ if __name__  == "__main__":
         ])
 
     model = {'encoder' : encoder, 'decoder' : decoder}
+    hyper_params = {'embed_size':embed_size,
+                    'batch_size':batch_size,
+                    'num_layers':num_layers,
+                    'hidden_size':hidden_size,
+                    'cnn':cnn,
+                    'decoder_lr':decoder_lr,
+                    'encoder_lr':encoder_lr
+                    }
 
     #optimizer = torch.optim.Adam(params,lr=learning_rate)
     # total_step = math.ceil(len(train_data_loader.dataset.caption_lengths) / train_data_loader.batch_sampler.batch_size)
@@ -124,7 +132,7 @@ if __name__  == "__main__":
     print('Start Training!')
 
     fit(model, criterion, optimizer, dataloader_dict,
-        num_epochs, device, stage, last_epoch=last_epoch)
+        num_epochs, device, stage, hyper_params, last_epoch=last_epoch)
 
 
 
