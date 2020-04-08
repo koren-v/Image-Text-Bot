@@ -81,7 +81,7 @@ if __name__  == "__main__":
 
     if args.load_model:
         name = input('Type name of encoder/decoder')
-        last_epoch = int(name[0])  
+        last_epoch = int(name[1])  
         if torch.cuda.is_available():
             encoder.load_state_dict(torch.load('./models/encoder'+name+'.pth'))
             decoder.load_state_dict(torch.load('./models/decoder'+name+'.pth'))
