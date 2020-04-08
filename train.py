@@ -15,11 +15,12 @@ import torch.utils.data as data
 import torch
 import torch.nn as nn
 import torchvision.models as models
-from transformers import AdamW, get_linear_schedule_with_warmup
-#from transformers import WarmupLinearSchedule as get_linear_schedule_with_warmup
+from transformers import AdamW#, get_linear_schedule_with_warmup
+from transformers import WarmupLinearSchedule as get_linear_schedule_with_warmup
 
 from model import EncoderCNN, DecoderRNN, LanguageTransformer
-from train_utils import *
+#from train_utils import *
+from learner import Learner
 
 
 # Define a transform to pre-process the training images.
@@ -42,7 +43,8 @@ if __name__  == "__main__":
                         help="num of epoches")
     parser.add_argument("--encoder_lr", type=float)
     parser.add_argument("--decoder_lr", type=float)
-    parser.add_argument('--adam', action="store_true")
+    parser.add_argument('--adamw', type=float, default=0.1, help="warmup ratio")
+    parser.add_argument("--accum_step", type=int, default=16)
     parser.add_argument("--stage")
     parser.add_argument("--cnn", default='resnet101')
     parser.add_argument("--vocab_from_file", action="store_true")
@@ -122,7 +124,22 @@ if __name__  == "__main__":
 
     criterion = nn.CrossEntropyLoss()
 
-    if args.adam:
+    if args.adamw:
+        optimizer = AdamW([
+                {"params":decoder.parameters(),"lr": decoder_lr},
+                {"params":encoder_params, "lr": encoder_lr},
+                        ])
+
+        grad_acumulation_step = args.accum_step
+        num_epoch_steps = math.ceil(len(train_data_loader.dataset.caption_lengths) \
+                                    / train_data_loader.batch_sampler.batch_size)
+        num_training_steps = num_epoch_steps*num_epochs / grad_acumulation_step
+
+        num_warmup_steps = int(num_training_steps*args.adamw)
+        scheduler = get_linear_schedule_with_warmup(optimizer,
+                                                    num_warmup_steps, 
+                                                    num_training_steps)        
+    else:
         optimizer = torch.optim.Adam(
             [
                 {"params":decoder.parameters(),"lr": decoder_lr},
@@ -130,21 +147,6 @@ if __name__  == "__main__":
             ])
         scheduler = None
         grad_acumulation_step = None
-    else:
-        optimizer = AdamW([
-                {"params":decoder.parameters(),"lr": decoder_lr},
-                {"params":encoder_params, "lr": encoder_lr},
-                        ])
-
-        grad_acumulation_step = 16
-        num_epoch_steps = math.ceil(len(train_data_loader.dataset.caption_lengths) \
-                                    / train_data_loader.batch_sampler.batch_size)
-        num_training_steps = num_epoch_steps*num_epochs / grad_acumulation_step
-
-        num_warmup_steps = 250
-        scheduler = get_linear_schedule_with_warmup(optimizer,
-                                                    num_warmup_steps, 
-                                                    num_training_steps)
 
     model = {'encoder' : encoder, 'decoder' : decoder}
     hyper_params = {'embed_size':embed_size,
@@ -155,12 +157,14 @@ if __name__  == "__main__":
                     'decoder_lr':decoder_lr,
                     'encoder_lr':encoder_lr
                     }
-  
+    
+    
     # total_step = math.ceil(len(train_data_loader.dataset.caption_lengths) / train_data_loader.batch_sampler.batch_size)
     # total_val_step = math.ceil(len(val_data_loader.dataset.caption_lengths) / val_data_loader.batch_sampler.batch_size)
 
+    learner = Learner(model, criterion, optimizer, dataloader_dict,
+                      num_epochs, device, stage, hyper_params, 
+                      scheduler = scheduler, last_epoch=last_epoch, grad_acumulation_step = grad_acumulation_step)
+    
     print('Start Training!')
-
-    fit(model, criterion, optimizer, dataloader_dict,
-        num_epochs, device, stage, hyper_params, 
-        scheduler = scheduler, last_epoch=last_epoch, grad_acumulation_step = grad_acumulation_step)
+    learner.fit()

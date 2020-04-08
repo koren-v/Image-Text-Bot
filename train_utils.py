@@ -30,6 +30,16 @@ def gen_nopeek_mask(length):
     mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
     return mask
 
+def add_examples(captions_out, outputs, data_loader, num_examples=4):
+    examples = ''
+    data_loader = data_loader
+    for ground_truth, prediction in zip(captions_out[:num_examples,:], outputs[:num_examples,:,:]):
+        prediction = torch.argmax(prediction, axis=1)
+        truth_text = [data_loader.dataset.vocab.idx2word[int(idx)] for idx in ground_truth]
+        preds_text = [data_loader.dataset.vocab.idx2word[int(idx)] for idx in prediction]
+        examples += ' '.join(truth_text) + '/' + ' '.join(preds_text) + '\n'
+    return examples
+
 def epoch(model, phase, device, criterion, optimizer, 
           data_loader, tb, grad_acumulation_step, scheduler=None):
 
@@ -53,7 +63,7 @@ def epoch(model, phase, device, criterion, optimizer,
     total_steps = math.ceil(len(data_loader.dataset.caption_lengths)\
                              / data_loader.batch_sampler.batch_size)
 
-    optimizer.zero_grad()
+    #optimizer.zero_grad()
     for step in range(total_steps):
         
         indices = data_loader.dataset.get_train_indices()        
@@ -84,8 +94,14 @@ def epoch(model, phase, device, criterion, optimizer,
 
             loss = criterion(outputs.view(-1, vocab_size), captions_out.reshape(-1))
 
+            examples = add_examples(captions_out, outputs, data_loader)
+            import pdb
+            pdb.set_trace()
+            tb.add_text('ground_truth/predictions', examples, step)
+
             if phase == 'train':
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(decoder.parameters(), 1.0)
                 if (step+1)%grad_acumulation_step == 0:    
                     optimizer.step()
                     if scheduler: scheduler.step()
@@ -148,10 +164,10 @@ def fit(model, criterion, optimizer, dataloader_dict,
                 valid_loss.append(epoch_dict['epoch_loss'])
                 valid_bleu.append(epoch_dict['epoch_bleu'])
 
-                model_name = '{}_{:.2f}_val_{:.2f}_tr_{}.pth'.format(i+last_epoch if last_epoch else i,
-                                                                    valid_loss[-1],
-                                                                    train_loss[-1],
-                                                                    stage)
+                model_name = '_{}_{:.2f}_val_{:.2f}_tr_{}.pth'.format(i+last_epoch if last_epoch else i,
+                                                                      valid_loss[-1],
+                                                                      train_loss[-1],
+                                                                      stage)
                 torch.save(epoch_dict['decoder'].state_dict(),
                                 os.path.join('./models', 'decoder'+model_name))
                 torch.save(epoch_dict['encoder'].state_dict(),
