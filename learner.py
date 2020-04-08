@@ -146,9 +146,9 @@ class Learner():
                     for name, weight in decoder.named_parameters():
                         self.tb.add_histogram(name, weight, step)
                         self.tb.add_histogram(f'{name}.grad', weight.grad, step)
-                else: pass
-                examples = self.add_examples(captions_out, outputs, phase)
-                self.tb.add_text('ground_truth/predictions', examples, step)
+                else:
+                    examples = self.add_examples(captions_out, outputs, phase)
+                    self.tb.add_text('ground_truth/predictions', examples, step)
 
             running_loss += loss.item() * features.size(0)
             bleu4 = self.compute_metric(captions_out, outputs)
