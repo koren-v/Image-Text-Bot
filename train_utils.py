@@ -132,7 +132,7 @@ def fit(model, criterion, optimizer, dataloader_dict,
                 valid_loss.append(epoch_dict['epoch_loss'])
                 valid_bleu.append(epoch_dict['epoch_bleu'])
 
-                model_name = '{}_{:.2f}_val_{:.2f}_tr_{}.pth'.format(i+last_epoch if last_epoch else i,
+                model_name = '_{}_{:.2f}_val_{:.2f}_tr_{}.pth'.format(i+last_epoch if last_epoch else i,
                                                                     valid_loss[-1],
                                                                     train_loss[-1],
                                                                     stage)
