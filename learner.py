@@ -102,7 +102,7 @@ class Learner():
         total_steps = math.ceil(len(self.dataloader_dict[phase].dataset.caption_lengths)\
                                 / self.dataloader_dict[phase].batch_sampler.batch_size)
 
-        #optimizer.zero_grad()
+        optimizer.zero_grad()
         for step in range(total_steps):
 
             indices = self.dataloader_dict[phase].dataset.get_train_indices()        
@@ -130,6 +130,7 @@ class Learner():
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(decoder.parameters(), 1.0)
                     if (step+1)%self.grad_acumulation_step == 0:
+                        self.optimizer.step()
                         self.optimizer.zero_grad()
                     # writting weights and grads to tensorboard's histogram    
                     for name, weight in decoder.named_parameters():
