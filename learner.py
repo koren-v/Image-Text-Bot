@@ -58,10 +58,10 @@ class Learner():
                     valid_loss.append(epoch_dict['epoch_loss'])
                     valid_bleu.append(epoch_dict['epoch_bleu'])
 
-                    model_name = '_{}_{:.2f}_val_{:.2f}_tr_{}.pth'.format(i+last_epoch if last_epoch else i,
+                    model_name = '_{}_{:.2f}_val_{:.2f}_tr_{}.pth'.format(i+self.last_epoch if self.last_epoch else i,
                                                                         valid_loss[-1],
                                                                         train_loss[-1],
-                                                                        stage)
+                                                                        self.stage)
                     torch.save(epoch_dict['decoder'].state_dict(),
                                     os.path.join('./models', 'decoder'+model_name))
                     torch.save(epoch_dict['encoder'].state_dict(),
@@ -77,7 +77,7 @@ class Learner():
         metrics = {'Train_Loss': train_loss[-1], 'Val_Loss': valid_loss[-1],
                 'Train_Bleu': train_bleu[-1], 'Valid_Bleu': valid_bleu[-1]}
 
-        self.tb.add_hparams(hyper_params, metrics)
+        self.tb.add_hparams(self.hyper_params, metrics)
         self.tb.close()
 
     def epoch(self, phase):
