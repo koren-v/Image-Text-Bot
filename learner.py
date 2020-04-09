@@ -102,7 +102,7 @@ class Learner():
         total_steps = math.ceil(len(self.dataloader_dict[phase].dataset.caption_lengths)\
                                 / self.dataloader_dict[phase].batch_sampler.batch_size)
 
-        optimizer.zero_grad()
+        #optimizer.zero_grad()
         for step in range(total_steps):
 
             indices = self.dataloader_dict[phase].dataset.get_train_indices()        
