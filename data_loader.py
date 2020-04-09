@@ -15,6 +15,7 @@ def get_loader(transform,
                batch_size=1,
                vocab_threshold=None,
                vocab_file='./vocab.pkl',
+               glove_file='./glove.pkl',
                start_word="<start>",
                end_word="<end>",
                unk_word="<unk>",
@@ -61,6 +62,7 @@ def get_loader(transform,
                           batch_size=batch_size,
                           vocab_threshold=vocab_threshold,
                           vocab_file=vocab_file,
+                          glove_file=glove_file,
                           start_word=start_word,
                           end_word=end_word,
                           unk_word=unk_word,
@@ -100,12 +102,12 @@ def get_loader(transform,
 
 class CoCoDataset(data.Dataset):
     
-    def __init__(self, transform, mode, batch_size, vocab_threshold, vocab_file, start_word, 
+    def __init__(self, transform, mode, batch_size, vocab_threshold, vocab_file, glove_file, start_word, 
         end_word, unk_word, annotations_file, vocab_from_file, img_folder):
         self.transform = transform
         self.mode = mode
         self.batch_size = batch_size
-        self.vocab = Vocabulary(vocab_threshold, vocab_file, start_word,
+        self.vocab = Vocabulary(vocab_threshold, vocab_file, glove_file, start_word,
             end_word, unk_word, annotations_file, vocab_from_file)
         self.img_folder = img_folder
         self.sel_length = None

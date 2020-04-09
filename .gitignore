@@ -1,9 +1,11 @@
 /coco2014/
 /models/
 /.vscode/
-vocab.pkl
+*.pkl
 /__pycache__/
 /train2014
 /val2014
 /captions
 /runs
+/glove_txt/
+/6B.300.dat

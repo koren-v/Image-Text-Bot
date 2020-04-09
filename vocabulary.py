@@ -1,6 +1,7 @@
 import nltk
 import pickle
 import os.path
+import numpy as np
 from pycocotools.coco import COCO
 from collections import Counter
 
@@ -9,11 +10,13 @@ class Vocabulary(object):
     def __init__(self,
         vocab_threshold,
         vocab_file='./vocab.pkl',
+        glove_file='./glove.pkl', 
         start_word="<start>",
         end_word="<end>",
         unk_word="<unk>",
         annotations_file='./cocoapi/annotations/captions_train2014.json',
-        vocab_from_file=False):
+        vocab_from_file=False, 
+        embedd_dimention = 300):
         """Initialize the vocabulary.
         Args:
           vocab_threshold: Minimum word count threshold.
@@ -27,11 +30,13 @@ class Vocabulary(object):
         """
         self.vocab_threshold = vocab_threshold
         self.vocab_file = vocab_file
+        self.glove_file = glove_file
         self.start_word = start_word
         self.end_word = end_word
         self.unk_word = unk_word
         self.annotations_file = annotations_file
         self.vocab_from_file = vocab_from_file
+        self.embedd_dimention = embedd_dimention
         self.get_vocab()
 
     def get_vocab(self):
@@ -41,6 +46,7 @@ class Vocabulary(object):
                 vocab = pickle.load(f)
                 self.word2idx = vocab.word2idx
                 self.idx2word = vocab.idx2word
+                self.weight_matrix = vocab.weight_matrix
             print('Vocabulary successfully loaded from vocab.pkl file!')
         else:
             self.build_vocab()
@@ -50,10 +56,11 @@ class Vocabulary(object):
     def build_vocab(self):
         """Populate the dictionaries for converting tokens to integers (and vice-versa)."""
         self.init_vocab()
+        self.load_glove_dict()
+        self.add_captions()
         self.add_word(self.start_word)
         self.add_word(self.end_word)
         self.add_word(self.unk_word)
-        self.add_captions()
 
     def init_vocab(self):
         """Initialize the dictionaries for converting tokens to integers (and vice-versa)."""
@@ -61,11 +68,19 @@ class Vocabulary(object):
         self.idx2word = {}
         self.idx = 0
 
+    def load_glove_dict(self):
+        with open(self.glove_file, 'rb') as f:
+            self.glove = pickle.load(f)
+
     def add_word(self, word):
         """Add a token to the vocabulary."""
         if not word in self.word2idx:
             self.word2idx[word] = self.idx
             self.idx2word[self.idx] = word
+            try:
+                self.weight_matrix[self.idx] = self.glove[word]
+            except:
+                self.weight_matrix[self.idx] = np.random.normal(scale=0.6, size=(self.embedd_dimention,))
             self.idx += 1
 
     def add_captions(self):
@@ -83,6 +98,7 @@ class Vocabulary(object):
 
         words = [word for word, cnt in counter.items() if cnt >= self.vocab_threshold]
 
+        self.weight_matrix = np.zeros((len(words)+3,self.embedd_dimention)) # +3 for start_word, end_word, unknown word
         for i, word in enumerate(words):
             self.add_word(word)
 
