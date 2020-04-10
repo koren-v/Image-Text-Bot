@@ -49,6 +49,7 @@ if __name__  == "__main__":
     parser.add_argument("--num_layers", type=int, default=2)
     parser.add_argument("--dropout", type=float, default=0.0)
     parser.add_argument("--weight_decay", type=float, default=0.0)
+    parser.add_argument("--freeze_glove", action="store_true")
     parser.add_argument("--adam", action="store_true")
     parser.add_argument("--scheduler", action="store_true")
     parser.add_argument("--load_model", action="store_true")
@@ -85,7 +86,13 @@ if __name__  == "__main__":
     encoder=EncoderCNN(embed_size, cnn)
     encoder=encoder.to(device)
 
-    decoder=DecoderRNN(weight_matrix, hidden_size=hidden_size , vocab_size=vocab_size, num_layers=num_layers, dropout=dropout)
+    decoder=DecoderRNN(weight_matrix, 
+                       hidden_size=hidden_size, 
+                       vocab_size=vocab_size, 
+                       num_layers=num_layers, 
+                       dropout=dropout,
+                       non_trainable = args.freeze_glove)
+
     decoder=decoder.to(device)
 
     if args.load_model:

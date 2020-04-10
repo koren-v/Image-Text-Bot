@@ -46,12 +46,12 @@ class EncoderCNN(nn.Module):
                   param.requires_grad = True
 
 class DecoderRNN(nn.Module):
-    def __init__(self, weights_matrix, hidden_size, vocab_size, num_layers=1, dropout=0):
+    def __init__(self, weights_matrix, hidden_size, vocab_size, num_layers=1, dropout=0, non_trainable=False):
         super(DecoderRNN, self).__init__()
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
         self.num_layers=num_layers
-        self.word_embeddings, num_embeddings, embedding_dim = create_emb_layer(weights_matrix)
+        self.word_embeddings, num_embeddings, embedding_dim = create_emb_layer(weights_matrix, non_trainable)
         #self.word_embeddings = nn.Embedding(vocab_size, embed_size)
         self.linear = nn.Linear(hidden_size, vocab_size)        
         self.lstm = nn.LSTM(input_size=embedding_dim,

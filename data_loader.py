@@ -137,7 +137,8 @@ class CoCoDataset(data.Dataset):
             ann_id = self.ids[index]
             caption = self.coco.anns[ann_id]['caption']
             img_id = self.coco.anns[ann_id]['image_id']
-            path = self.coco.loadImgs(img_id)[0]['file_name']
+            path = self.coco.loadImgs(img_id)[0]['file_name'] #короч походу цю штуку можна 
+                                                              #буде заюзати для підвантаження опису, бо видає тей словник з json'a 
 
             # Convert image to tensor and pre-process using transform
             image = Image.open(os.path.join(self.img_folder, path)).convert('RGB')
