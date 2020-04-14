@@ -16,7 +16,8 @@ class Vocabulary(object):
         unk_word="<unk>",
         annotations_file='./cocoapi/annotations/captions_train2014.json',
         vocab_from_file=False, 
-        embedd_dimention = 300):
+        embedd_dimention = 300,
+        dataset = 'coco'):
         """Initialize the vocabulary.
         Args:
           vocab_threshold: Minimum word count threshold.
@@ -34,9 +35,11 @@ class Vocabulary(object):
         self.start_word = start_word
         self.end_word = end_word
         self.unk_word = unk_word
+        self.num_special_words = 3
         self.annotations_file = annotations_file
         self.vocab_from_file = vocab_from_file
         self.embedd_dimention = embedd_dimention
+        self.dataset = dataset
         self.get_vocab()
 
     def get_vocab(self):
@@ -85,20 +88,24 @@ class Vocabulary(object):
 
     def add_captions(self):
         """Loop over training captions and add all tokens to the vocabulary that meet or exceed the threshold."""
-        coco = COCO(self.annotations_file)
         counter = Counter()
-        ids = coco.anns.keys()
+        if self.dataset=='coco':
+            coco = COCO(self.annotations_file)
+            ids = coco.anns.keys()
+            data = coco.anns
+        elif self.dataset=='insta':
+            insta = pickle.load(open(self.annotations_file, 'rb'))
+            ids = list(insta.keys())  
+            data = insta 
         for i, id in enumerate(ids):
-            caption = str(coco.anns[id]['caption'])
+            caption = str(data[id]['caption'])
             tokens = nltk.tokenize.word_tokenize(caption.lower())
             counter.update(tokens)
-
             if i % 100000 == 0:
                 print("[%d/%d] Tokenizing captions..." % (i, len(ids)))
 
         words = [word for word, cnt in counter.items() if cnt >= self.vocab_threshold]
-
-        self.weight_matrix = np.zeros((len(words)+3,self.embedd_dimention)) # +3 for start_word, end_word, unknown word
+        self.weight_matrix = np.zeros((len(words)+self.num_special_words,self.embedd_dimention))
         for i, word in enumerate(words):
             self.add_word(word)
 

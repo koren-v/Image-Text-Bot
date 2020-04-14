@@ -39,10 +39,11 @@ if __name__  == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("num_epochs", type=int,
                         help="num of epoches")
+    parser.add_argument("--dataset", default='coco')
     parser.add_argument("--encoder_lr", type=float)
     parser.add_argument("--decoder_lr", type=float)
     parser.add_argument("--accum_step", type=int, default=1)
-    parser.add_argument("--stage")
+    parser.add_argument("--stage", default='default_stage')
     parser.add_argument("--cnn", default='resnet101')
     parser.add_argument("--vocab_from_file", action="store_true")
     parser.add_argument("--hidden_size", type=int, default=768)
@@ -69,12 +70,14 @@ if __name__  == "__main__":
                                 mode='train',
                                 batch_size=batch_size,
                                 vocab_threshold=vocab_threshold,
-                                vocab_from_file=vocab_from_file)
+                                vocab_from_file=vocab_from_file,
+                                dataset=args.dataset)
 
     val_data_loader = get_loader(transform=transform_train,
                                 mode='val',
                                 batch_size=batch_size,
-                                vocab_from_file=True)
+                                vocab_from_file=True,
+                                dataset=args.dataset)
 
     dataloader_dict = {'train':train_data_loader, 'val': val_data_loader}                         
     vocab_size = len(train_data_loader.dataset.vocab)
