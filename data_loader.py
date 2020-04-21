@@ -11,6 +11,9 @@ from tqdm import tqdm
 import random
 import json
 
+from nltk.tokenize import RegexpTokenizer
+regex_tokenizer = RegexpTokenizer(r'\w+')
+
 def get_loader(transform,
                mode='train',
                batch_size=1,
@@ -198,7 +201,8 @@ class InstaDataset(data.Dataset):
             print('Done: ', time.time()-start)
             self.ids = list(self.insta.keys())
             print('Obtaining caption lengths...')
-            all_tokens = [nltk.tokenize.word_tokenize(str(self.insta[index]['caption']).lower()) for index in tqdm(self.ids)]
+            all_tokens = [regex_tokenizer.tokenize(str(self.insta[index]['caption']).lower()) for index in tqdm(self.ids)]
+            #all_tokens = [nltk.tokenize.word_tokenize(str(self.insta[index]['caption']).lower()) for index in tqdm(self.ids)]
             self.caption_lengths = [len(token) for token in all_tokens]
         
     def __getitem__(self, index):
@@ -211,7 +215,7 @@ class InstaDataset(data.Dataset):
             image = self.transform(image)
 
             # Convert caption to tensor of word ids.
-            tokens = nltk.tokenize.word_tokenize(str(caption).lower())
+            tokens = regex_tokenizer.tokenize(str(caption).lower())
             caption = []
             # Forming input tensor 
             caption.append(self.vocab(self.vocab.start_word))
