@@ -3,6 +3,7 @@ import pickle
 import numpy as np
 from tqdm import tqdm
 
+
 if __name__ == "__main__":
 
     glove_path = 'glove_txt/'
@@ -24,8 +25,6 @@ if __name__ == "__main__":
         
     vectors = bcolz.carray(vectors[1:].reshape((400000, 300)), rootdir=f'{glove_path}/6B.300.dat', mode='w')
     vectors.flush()
-    # pickle.dump(words, open(f'{glove_path}/6B.300_words.pkl', 'wb'))
-    # pickle.dump(word2idx, open(f'{glove_path}/6B.300_idx.pkl', 'wb'))
     vectors = bcolz.open(f'{glove_path}/6B.300.dat')[:]
 
     glove = {w: vectors[word2idx[w]] for w in words}

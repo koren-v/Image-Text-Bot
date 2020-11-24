@@ -5,30 +5,20 @@ import numpy as np
 from pycocotools.coco import COCO
 from collections import Counter
 
-class Vocabulary(object):
 
+class Vocabulary(object):
     def __init__(self,
-        vocab_threshold,
-        vocab_file='./vocab.pkl',
-        glove_file='./glove.pkl', 
-        start_word="<start>",
-        end_word="<end>",
-        unk_word="<unk>",
-        annotations_file='./cocoapi/annotations/captions_train2014.json',
-        vocab_from_file=False, 
-        embedd_dimention = 300,
-        dataset = 'coco'):
-        """Initialize the vocabulary.
-        Args:
-          vocab_threshold: Minimum word count threshold.
-          vocab_file: File containing the vocabulary.
-          start_word: Special word denoting sentence start.
-          end_word: Special word denoting sentence end.
-          unk_word: Special word denoting unknown words.
-          annotations_file: Path for train annotation file.
-          vocab_from_file: If False, create vocab from scratch & override any existing vocab_file
-                           If True, load vocab from from existing vocab_file, if it exists
-        """
+                 vocab_threshold,
+                 vocab_file='./vocab.pkl',
+                 glove_file='./glove.pkl', 
+                 start_word="<start>",
+                 end_word="<end>",
+                 unk_word="<unk>",
+                 annotations_file='./cocoapi/annotations/captions_train2014.json',
+                 vocab_from_file=False, 
+                 embedd_dimension=300,
+                 dataset='coco'):
+
         self.vocab_threshold = vocab_threshold
         self.vocab_file = vocab_file
         self.glove_file = glove_file
@@ -38,9 +28,16 @@ class Vocabulary(object):
         self.num_special_words = 3
         self.annotations_file = annotations_file
         self.vocab_from_file = vocab_from_file
-        self.embedd_dimention = embedd_dimention
+        self.embedd_dimension = embedd_dimension
         self.dataset = dataset
         self.get_vocab()
+
+        # to set them during vocab creation
+        self.word2idx = None
+        self.idx2word = None
+        self.weight_matrix = None
+        self.idx = None
+        self.glove = None
 
     def get_vocab(self):
         """Load the vocabulary from file OR build the vocabulary from scratch."""
@@ -77,40 +74,40 @@ class Vocabulary(object):
 
     def add_word(self, word):
         """Add a token to the vocabulary."""
-        if not word in self.word2idx:
+        if word not in self.word2idx:
             self.word2idx[word] = self.idx
             self.idx2word[self.idx] = word
             try:
                 self.weight_matrix[self.idx] = self.glove[word]
-            except:
-                self.weight_matrix[self.idx] = np.random.normal(scale=0.6, size=(self.embedd_dimention,))
+            except KeyError:
+                self.weight_matrix[self.idx] = np.random.normal(scale=0.6, size=(self.embedd_dimension,))
             self.idx += 1
 
     def add_captions(self):
         """Loop over training captions and add all tokens to the vocabulary that meet or exceed the threshold."""
         counter = Counter()
-        if self.dataset=='coco':
+        if self.dataset == 'coco':
             coco = COCO(self.annotations_file)
             ids = coco.anns.keys()
             data = coco.anns
-        elif self.dataset=='insta':
+        elif self.dataset == 'insta':
             insta = pickle.load(open(self.annotations_file, 'rb'))
             ids = list(insta.keys())  
             data = insta 
-        for i, id in enumerate(ids):
-            caption = str(data[id]['caption'])
+        for i, idx in enumerate(ids):
+            caption = str(data[idx]['caption'])
             tokens = nltk.tokenize.word_tokenize(caption.lower())
             counter.update(tokens)
             if i % 100000 == 0:
                 print("[%d/%d] Tokenizing captions..." % (i, len(ids)))
 
         words = [word for word, cnt in counter.items() if cnt >= self.vocab_threshold]
-        self.weight_matrix = np.zeros((len(words)+self.num_special_words,self.embedd_dimention))
+        self.weight_matrix = np.zeros((len(words)+self.num_special_words,self.embedd_dimension))
         for i, word in enumerate(words):
             self.add_word(word)
 
     def __call__(self, word):
-        if not word in self.word2idx:
+        if word not in self.word2idx:
             return self.word2idx[self.unk_word]
         return self.word2idx[word]
 

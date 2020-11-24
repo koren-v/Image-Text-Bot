@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 import numpy as np
-import math
 import copy
 import torch.nn.functional as F
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 class EncoderCNN(nn.Module):
     def __init__(self, embed_size, cnn):
@@ -15,6 +15,9 @@ class EncoderCNN(nn.Module):
             encoder = models.resnet101(pretrained=True)
         elif cnn == 'vgg19':
             encoder = models.vgg19(pretrained=True)
+        else:
+            raise KeyError(f"cnn parameter can be 'resnet101' or 'vgg19', your input: {cnn}")
+
         for param in encoder.parameters():
             param.requires_grad_(False)
         
@@ -34,32 +37,36 @@ class EncoderCNN(nn.Module):
         
         return features
 
-
     def freeze_encoder(self):
         for param in self.encoder.parameters():
             param.requires_grad = False
     
     def unfreeze_encoder(self, num_freezed):
-        for l, child in enumerate(self.encoder.children()):
-            if l > num_freezed:
+        for layer, child in enumerate(self.encoder.children()):
+            if layer > num_freezed:
                 for param in child.parameters():
-                  param.requires_grad = True
+                    param.requires_grad = True
+
 
 class DecoderRNN(nn.Module):
     def __init__(self, weights_matrix, hidden_size, vocab_size, num_layers=1, dropout=0, non_trainable=False):
         super(DecoderRNN, self).__init__()
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
-        self.num_layers=num_layers
+        self.num_layers = num_layers
         self.word_embeddings, num_embeddings, embedding_dim = create_emb_layer(weights_matrix, non_trainable)
-        #self.word_embeddings = nn.Embedding(vocab_size, embed_size)
+
         self.linear = nn.Linear(hidden_size, vocab_size)        
         self.lstm = nn.LSTM(input_size=embedding_dim,
                             hidden_size=hidden_size,
                             num_layers=num_layers,
                             dropout=dropout, 
                             batch_first=True, 
-                            bidirectional=False)        
+                            bidirectional=False)
+
+        # to store during forward pass
+        self.batch_size = None
+        self.hidden = None
         
     def init_hidden(self, batch_size):        
         return torch.zeros(self.num_layers, batch_size, self.hidden_size).to(device), \
@@ -70,9 +77,9 @@ class DecoderRNN(nn.Module):
         self.batch_size = features.shape[0]
         self.hidden = self.init_hidden(self.batch_size)
         embeds = self.word_embeddings(captions)       
-        inputs = torch.cat((features.unsqueeze(dim=1),embeds), dim=1)                      
-        lstm_out, self.hidden = self.lstm(inputs,self.hidden)
-        outputs=self.linear(lstm_out)       
+        inputs = torch.cat((features.unsqueeze(dim=1), embeds), dim=1)
+        lstm_out, self.hidden = self.lstm(inputs, self.hidden)
+        outputs = self.linear(lstm_out)
         return outputs 
 
     def greedy_sample(self, inputs):        
@@ -88,21 +95,20 @@ class DecoderRNN(nn.Module):
             outputs = outputs.squeeze(1) 
             _, max_idx = torch.max(outputs, dim=1) 
             cap_output.append(max_idx.cpu().numpy()[0].item())             
-            if (max_idx == 1):
+            if max_idx == 1:
                 break
             
             inputs = self.word_embeddings(max_idx) 
             inputs = inputs.unsqueeze(1)
 
             max_len += 1
-            if (max_len) == 20:
+            if max_len == 20:
                 break
 
         return cap_output    
 
-    def beam(self, inputs):
+    def beam(self, inputs, k=10):
 
-        k = 10     
         cap_output = []
         batch_size = inputs.shape[0]         
         hidden = self.init_hidden(batch_size)
@@ -121,13 +127,13 @@ class DecoderRNN(nn.Module):
         embeddings = [self.word_embeddings(idx.unsqueeze(0)).unsqueeze(1) for idx in indexes]
 
         # hiddens are the same for k generated words but it will more
-        # convinient to use them in the same 'style' as other objects 
+        # convenient to use them in the same 'style' as other objects
         hiddens = [hidden]*k
 
         # collecting sentences
         sentences = [[index] for index in indexes]
 
-        # startin length of each sentence is 1 now
+        # starting length of each sentence is 1 now
         length = 1
         
         while True:
@@ -161,14 +167,13 @@ class DecoderRNN(nn.Module):
                 current_indexes = torch.cat((current_indexes, temp_indexes))
                 current_hiddens.extend([h_out]*k)
 
-            
-            candidates = torch.topk(current_scores, k)[1] # indexes in arrays for best childs
-            best_candidates_indexes = current_indexes[candidates] # indexes in vocab -||-
-            best_candidates_scores = current_scores[candidates] # their scores
+            candidates = torch.topk(current_scores, k)[1]  # indexes in arrays for best children
+            best_candidates_indexes = current_indexes[candidates]  # indexes in vocab -||-
+            best_candidates_scores = current_scores[candidates]  # their scores
             best_hiddens = [current_hiddens[candidate] for candidate in candidates] 
 
-            scores = best_candidates_scores # updating scores
-            indexes = best_candidates_indexes # updating indexes (to generate next words)
+            scores = best_candidates_scores  # updating scores
+            indexes = best_candidates_indexes  # updating indexes (to generate next words)
             embeddings = [self.word_embeddings(idx.unsqueeze(0)).unsqueeze(1) for idx in indexes]
             hiddens = best_hiddens
 
@@ -179,21 +184,20 @@ class DecoderRNN(nn.Module):
                 temp.append(sts)
                 temp[i].append(current_indexes[idx])
 
-            # updatinf current sentences
+            # updating current sentences
             sentences = temp      
 
             if length == 20:
                 break
             
-        # deviding score to length of the sentence
+        # dividing score to length of the sentence
         normalized_score = []
         for i, score in enumerate(scores):
             try:
                 score /= sentences[i].index(1)
-            except:
-                score /= len(sentences[i]) # if we don't get by generating <eos> token
+            except IndexError:
+                score /= len(sentences[i])  # if we don't get by generating <eos> token
             normalized_score.append(float(score))
-
 
         print('\nMEAN: ', np.mean(normalized_score))
         print('STD: ', np.std(normalized_score))
@@ -206,9 +210,9 @@ class DecoderRNN(nn.Module):
         # returning truncated sentence 
         try:
             best_sentence = best_sentence[:best_sentence.index(1)]
-        except:
+        except IndexError:
             best_sentence = best_sentence
-        best_sentence =  [int(word) for word in best_sentence]
+        best_sentence = [int(word) for word in best_sentence]
 
         return best_sentence
 

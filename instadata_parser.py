@@ -3,7 +3,6 @@ import pickle
 from tqdm import tqdm
 
 
-
 def parse(annotations_file):
     print('Parsing the ', annotations_file)
     insta = json.load(open(path+annotations_file, 'r'))
@@ -14,6 +13,7 @@ def parse(annotations_file):
     annotations_file = annotations_file[:-4]
     print('Num examples: ', len(parsed_insta))
     return parsed_insta, annotations_file
+
 
 if __name__ == "__main__":
     path = './captions/annotations/'

@@ -1,23 +1,14 @@
-import os
-import sys
 import argparse
 
 import nltk
-from nltk.translate.bleu_score import sentence_bleu
 from data_loader import get_loader
 from torchvision import transforms
 
-import math
-import numpy as np
-
-import torch.utils.data as data
 
 import torch
 import torch.nn as nn
-import torchvision.models as models
 
 from model import EncoderCNN, DecoderRNN
-# from train_utils import *
 from learner import Learner
 
 # Define a transform to pre-process the training images.
@@ -32,7 +23,7 @@ transform_train = transforms.Compose([
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-if __name__  == "__main__":
+if __name__ == "__main__":
 
     nltk.download('punkt')
 
@@ -58,7 +49,6 @@ if __name__  == "__main__":
     parser.add_argument("--batch_size", type=int, default=512)
     args = parser.parse_args()
 
-    embed_size=512
     batch_size = args.batch_size
     num_layers = args.num_layers
     hidden_size = args.hidden_size
@@ -67,17 +57,17 @@ if __name__  == "__main__":
     vocab_from_file = args.vocab_from_file
 
     train_data_loader = get_loader(transform=transform_train,
-                                mode='train',
-                                batch_size=batch_size,
-                                vocab_threshold=vocab_threshold,
-                                vocab_from_file=vocab_from_file,
-                                dataset=args.dataset)
+                                   mode='train',
+                                   batch_size=batch_size,
+                                   vocab_threshold=vocab_threshold,
+                                   vocab_from_file=vocab_from_file,
+                                   dataset=args.dataset)
 
     val_data_loader = get_loader(transform=transform_train,
-                                mode='val',
-                                batch_size=batch_size,
-                                vocab_from_file=True,
-                                dataset=args.dataset)
+                                 mode='val',
+                                 batch_size=batch_size,
+                                 vocab_from_file=True,
+                                 dataset=args.dataset)
 
     dataloader_dict = {'train':train_data_loader, 'val': val_data_loader}                         
     vocab_size = len(train_data_loader.dataset.vocab)
@@ -86,17 +76,17 @@ if __name__  == "__main__":
 
     cnn = args.cnn
 
-    encoder=EncoderCNN(embed_size, cnn)
-    encoder=encoder.to(device)
+    encoder = EncoderCNN(embed_size, cnn)
+    encoder = encoder.to(device)
 
-    decoder=DecoderRNN(weight_matrix, 
-                       hidden_size=hidden_size, 
-                       vocab_size=vocab_size, 
-                       num_layers=num_layers, 
-                       dropout=dropout,
-                       non_trainable = args.freeze_glove)
+    decoder = DecoderRNN(weight_matrix, 
+                         hidden_size=hidden_size, 
+                         vocab_size=vocab_size, 
+                         num_layers=num_layers, 
+                         dropout=dropout,
+                         non_trainable=args.freeze_glove)
 
-    decoder=decoder.to(device)
+    decoder = decoder.to(device)
 
     if args.load_model:
         name = input('Type name of encoder/decoder')
@@ -105,13 +95,11 @@ if __name__  == "__main__":
             encoder.load_state_dict(torch.load('./models/encoder'+name+'.pth'))
             decoder.load_state_dict(torch.load('./models/decoder'+name+'.pth'))
         else:
-            encoder.load_state_dict(torch.load('./models/encoder'+name+'.pth', 
-                                            map_location=torch.device('cpu')))
-            decoder.load_state_dict(torch.load('./models/encoder'+name+'.pth', 
-                                            map_location=torch.device('cpu')))
+            encoder.load_state_dict(torch.load('./models/encoder'+name+'.pth', map_location=torch.device('cpu')))
+            decoder.load_state_dict(torch.load('./models/encoder'+name+'.pth', map_location=torch.device('cpu')))
 
     num_epochs = args.num_epochs
-    grad_acumulation_step = args.accum_step           
+    grad_accumulation_step = args.accum_step           
     decoder_lr = args.decoder_lr
     encoder_lr = args.encoder_lr
     stage = args.stage
@@ -120,10 +108,10 @@ if __name__  == "__main__":
     if args.unfreeze_encoder:
         encoder.unfreeze_encoder(args.unfreeze_encoder)
         encoder_params = []
-        for name,param in encoder.named_parameters():
-            if param.requires_grad == True:
+        for name, param in encoder.named_parameters():
+            if param.requires_grad:
                 encoder_params.append(param)
-                print("\t",name)
+                print("\t", name)
     else:
         encoder_params = list(encoder.linear.parameters()) + list(encoder.bn1.parameters())
 
@@ -133,9 +121,9 @@ if __name__  == "__main__":
         optimizer_name = 'Adam' 
         optimizer = torch.optim.Adam(
             [
-                {"params":decoder.parameters(),"lr": decoder_lr},
-                {"params":encoder_params, "lr": encoder_lr},
-            ], weight_decay = args.weight_decay)
+                {"params": decoder.parameters(), "lr": decoder_lr},
+                {"params": encoder_params, "lr": encoder_lr},
+            ], weight_decay=args.weight_decay)
     else:
         optimizer_name = 'ASGD'
         optimizer = torch.optim.ASGD(
@@ -151,30 +139,23 @@ if __name__  == "__main__":
     else:
         scheduler = None
 
-
-    model = {'encoder' : encoder, 'decoder' : decoder}
-    hyper_params = {'embed_size':embed_size,
-                    'batch_size':batch_size,
-                    'num_layers':num_layers,
-                    'dropout':dropout,
+    model = {'encoder': encoder, 'decoder': decoder}
+    hyper_params = {'embed_size': embed_size,
+                    'batch_size': batch_size,
+                    'num_layers': num_layers,
+                    'dropout': dropout,
                     'weight_decay': args.weight_decay,
                     'optimizer': optimizer_name,
-                    'hidden_size':hidden_size,
-                    'cnn':cnn,
-                    'decoder_lr':decoder_lr,
-                    'encoder_lr':encoder_lr,
-                    'grad_acumulation_step':grad_acumulation_step
-                    }
+                    'hidden_size': hidden_size,
+                    'cnn': cnn,
+                    'decoder_lr': decoder_lr,
+                    'encoder_lr': encoder_lr,
+                    'grad_accumulation_step': grad_accumulation_step}
 
-    # total_step = math.ceil(len(train_data_loader.dataset.caption_lengths) / train_data_loader.batch_sampler.batch_size)
-    # total_val_step = math.ceil(len(val_data_loader.dataset.caption_lengths) / val_data_loader.batch_sampler.batch_size)
     learner = Learner(model, criterion, optimizer, dataloader_dict,
                       num_epochs, device, stage, hyper_params, 
-                      scheduler = scheduler, last_epoch=last_epoch, grad_acumulation_step = grad_acumulation_step)
+                      scheduler=scheduler, last_epoch=last_epoch,
+                      grad_accumulation_step=grad_accumulation_step)
 
     print('Start Training!')
     learner.fit()
-
-
-
-
