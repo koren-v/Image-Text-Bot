@@ -9,34 +9,55 @@ import torch.nn.functional as F
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class EncoderCNN(nn.Module):
-    def __init__(self):
+    def __init__(self, embed_size, cnn):
         super(EncoderCNN, self).__init__()
-        encoder=models.wide_resnet101_2(pretrained=True)
+        if cnn == 'resnet101':
+            encoder = models.resnet101(pretrained=True)
+        elif cnn == 'vgg19':
+            encoder = models.vgg19(pretrained=True)
         for param in encoder.parameters():
             param.requires_grad_(False)
         
-        modules = list(encoder.children())[:-4]        
-        self.encoder = nn.Sequential(*modules)        
+        modules = list(encoder.children())[:-1]        
+        self.encoder = nn.Sequential(*modules)
+        if cnn == 'resnet101':
+            self.linear = nn.Linear(encoder.fc.in_features, embed_size)
+        elif cnn == 'vgg19':
+            self.linear = nn.Linear(encoder.classifier[6].in_features, embed_size)
+        self.bn1 = nn.BatchNorm1d(embed_size)        
         
     def forward(self, images):
         features = self.encoder(images)
-        batch_size = features.shape[0]
-        features_depth = features.shape[1]
-        features = features.reshape(features_depth, batch_size, -1) # [bs, 512, 784]
+        features = features.view(features.size(0), -1)
+        features = self.linear(features)
+        features = self.bn1(features)
+        
         return features
 
 
+    def freeze_encoder(self):
+        for param in self.encoder.parameters():
+            param.requires_grad = False
+    
+    def unfreeze_encoder(self, num_freezed):
+        for l, child in enumerate(self.encoder.children()):
+            if l > num_freezed:
+                for param in child.parameters():
+                  param.requires_grad = True
+
 class DecoderRNN(nn.Module):
-    def __init__(self, embed_size, hidden_size, vocab_size, num_layers=1):
+    def __init__(self, weights_matrix, hidden_size, vocab_size, num_layers=1, dropout=0, non_trainable=False):
         super(DecoderRNN, self).__init__()
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
         self.num_layers=num_layers
-        self.word_embeddings = nn.Embedding(vocab_size, embed_size)
+        self.word_embeddings, num_embeddings, embedding_dim = create_emb_layer(weights_matrix, non_trainable)
+        #self.word_embeddings = nn.Embedding(vocab_size, embed_size)
         self.linear = nn.Linear(hidden_size, vocab_size)        
-        self.lstm = nn.LSTM(input_size=embed_size,
+        self.lstm = nn.LSTM(input_size=embedding_dim,
                             hidden_size=hidden_size,
                             num_layers=num_layers,
+                            dropout=dropout, 
                             batch_first=True, 
                             bidirectional=False)        
         
@@ -192,46 +213,10 @@ class DecoderRNN(nn.Module):
         return best_sentence
 
 
-class LanguageTransformer(nn.Module):
-    def __init__(self, vocab_size, embedding_size, nhead, num_encoder_layers, num_decoder_layers, dim_feedforward, max_seq_length, pos_dropout, trans_dropout):
-        super().__init__()
-        self.embedding_size = embedding_size
+def create_emb_layer(weights_matrix, non_trainable=False):
+    num_embeddings, embedding_dim = weights_matrix.shape
+    emb_layer = nn.Embedding.from_pretrained(torch.Tensor(weights_matrix), freeze=False)
+    if non_trainable:
+        emb_layer.weight.requires_grad = False
 
-        #self.embed_src = nn.Embedding(vocab_size, embedding_size)
-        self.embed_tgt = nn.Embedding(vocab_size, embedding_size) #vocab_size, embed_size
-        self.pos_enc = PositionalEncoding(embedding_size, pos_dropout, max_seq_length)
-
-        self.transformer = nn.Transformer(embedding_size, nhead, num_encoder_layers, num_decoder_layers, dim_feedforward, trans_dropout)
-        self.fc = nn.Linear(embedding_size, vocab_size)
-
-    def forward(self, src, tgt, tgt_key_padding_mask, tgt_mask):
-        # src = rearrange(src, 'n s -> s n')
-        # tgt = rearrange(tgt, 'n t -> t n')
-        # src = src.unsqueeze(0)  # [1, batch_size, embed_size]
-        tgt = tgt.permute(1, 0) # [len_of_capture, batch_size, embed_size]
-
-        # src = self.pos_enc(self.embed_src(src) * math.sqrt(self.embedding_size)) 
-        tgt = self.pos_enc(self.embed_tgt(tgt) * math.sqrt(self.embedding_size))
-
-        output = self.transformer(src, tgt, tgt_mask=tgt_mask, tgt_key_padding_mask=tgt_key_padding_mask)
-
-        # output = rearrange(output, 't n e -> n t e')
-        output = output.permute(1, 0, 2)
-        return self.fc(output)
-
-class PositionalEncoding(nn.Module):
-    def __init__(self, embedding_size, dropout=0.1, max_len=100):
-        super(PositionalEncoding, self).__init__()
-        self.dropout = nn.Dropout(p=dropout)
-
-        pe = torch.zeros(max_len, embedding_size)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, embedding_size, 2).float() * (-math.log(10000.0) / embedding_size))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0).transpose(0, 1)
-        self.register_buffer('pe', pe)
-
-    def forward(self, x):
-        x = x + self.pe[:x.size(0), :]
-        return self.dropout(x)
+    return emb_layer, num_embeddings, embedding_dim

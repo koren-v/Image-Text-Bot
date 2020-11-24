@@ -1,5 +1,6 @@
-import nltk
 import os
+import nltk
+import pickle
 import torch
 import torch.utils.data as data
 from vocabulary import Vocabulary
@@ -10,16 +11,21 @@ from tqdm import tqdm
 import random
 import json
 
+from nltk.tokenize import RegexpTokenizer
+regex_tokenizer = RegexpTokenizer(r'\w+')
+
 def get_loader(transform,
                mode='train',
                batch_size=1,
                vocab_threshold=None,
                vocab_file='./vocab.pkl',
+               glove_file='./glove.pkl',
                start_word="<start>",
                end_word="<end>",
                unk_word="<unk>",
                vocab_from_file=True,
-               num_workers=0):
+               num_workers=0,
+               dataset = 'coco'):
     """Returns the data loader.
     Args:
       transform: Image transform.
@@ -41,13 +47,21 @@ def get_loader(transform,
     # Based on mode (train, val, test), obtain img_folder and annotations_file.
     if mode == 'train':
         if vocab_from_file==True: assert os.path.exists(vocab_file), "vocab_file does not exist.  Change vocab_from_file to False to create vocab_file."
-        img_folder = './train2014/train2014/'
-        annotations_file = './captions/annotations/captions_train2014.json'
+        if dataset=='coco':
+            img_folder = './train2014/train2014/'
+            annotations_file = './captions/annotations/captions_train2014.json'
+        elif dataset=='insta':
+            img_folder = './Insta/images/'
+            annotations_file = './captions/annotations/insta-caption-train.pkl'
     # validation
     if mode == 'val':
         if vocab_from_file==True: assert os.path.exists(vocab_file), "vocab_file does not exist.  Change vocab_from_file to False to create vocab_file."
-        img_folder = './val2014/val2014/'
-        annotations_file = './captions/annotations/captions_val2014.json'  
+        if dataset=='coco':
+            img_folder = './val2014/val2014/'
+            annotations_file = './captions/annotations/captions_val2014.json'
+        elif dataset=='insta':
+            img_folder = './Insta/images/'
+            annotations_file = './captions/annotations/insta-caption-test1.pkl' 
 
     if mode == 'test':
         assert batch_size==1, "Please change batch_size to 1 if testing your model."
@@ -56,30 +70,34 @@ def get_loader(transform,
         annotations_file = None
 
     # COCO caption dataset.
-    dataset = CoCoDataset(transform=transform,
-                          mode=mode,
-                          batch_size=batch_size,
-                          vocab_threshold=vocab_threshold,
-                          vocab_file=vocab_file,
-                          start_word=start_word,
-                          end_word=end_word,
-                          unk_word=unk_word,
-                          annotations_file=annotations_file,
-                          vocab_from_file=vocab_from_file,
-                          img_folder=img_folder)
+    if dataset=='coco':
+        dataset = CoCoDataset(transform=transform,
+                                mode=mode,
+                                batch_size=batch_size,
+                                vocab_threshold=vocab_threshold,
+                                vocab_file=vocab_file,
+                                glove_file=glove_file,
+                                start_word=start_word,
+                                end_word=end_word,
+                                unk_word=unk_word,
+                                annotations_file=annotations_file,
+                                vocab_from_file=vocab_from_file,
+                                img_folder=img_folder)
+    elif dataset=='insta':
+        dataset = InstaDataset(transform=transform,
+                                mode=mode,
+                                batch_size=batch_size,
+                                vocab_threshold=vocab_threshold,
+                                vocab_file=vocab_file,
+                                glove_file=glove_file,
+                                start_word=start_word,
+                                end_word=end_word,
+                                unk_word=unk_word,
+                                annotations_file=annotations_file,
+                                vocab_from_file=vocab_from_file,
+                                img_folder=img_folder)
 
-    if mode == 'train':
-        # Randomly sample a caption length, and sample indices with that length.
-        indices = dataset.get_train_indices()
-        # Create and assign a batch sampler to retrieve a batch with the sampled indices.
-        initial_sampler = data.sampler.SubsetRandomSampler(indices=indices)
-        # data loader for COCO dataset.
-        data_loader = data.DataLoader(dataset=dataset, 
-                                      num_workers=num_workers,
-                                      batch_sampler=data.sampler.BatchSampler(sampler=initial_sampler,
-                                                                              batch_size=dataset.batch_size,
-                                                                              drop_last=False))
-    elif mode == 'val':
+    if mode == 'train' or mode == 'val':
         # Randomly sample a caption length, and sample indices with that length.
         indices = dataset.get_train_indices()
         # Create and assign a batch sampler to retrieve a batch with the sampled indices.
@@ -100,27 +118,17 @@ def get_loader(transform,
 
 class CoCoDataset(data.Dataset):
     
-    def __init__(self, transform, mode, batch_size, vocab_threshold, vocab_file, start_word, 
+    def __init__(self, transform, mode, batch_size, vocab_threshold, vocab_file, glove_file, start_word, 
         end_word, unk_word, annotations_file, vocab_from_file, img_folder):
         self.transform = transform
         self.mode = mode
         self.batch_size = batch_size
-        self.vocab = Vocabulary(vocab_threshold, vocab_file, start_word,
-            end_word, unk_word, annotations_file, vocab_from_file)
+        self.vocab = Vocabulary(vocab_threshold, vocab_file, glove_file, start_word,
+                end_word, unk_word, annotations_file, vocab_from_file, dataset='coco')
         self.img_folder = img_folder
         self.sel_length = None
 
-        if self.mode == 'train':
-            self.coco = COCO(annotations_file)
-            self.ids = list(self.coco.anns.keys())
-            print('Obtaining caption lengths...')
-
-            all_tokens = [nltk.tokenize.word_tokenize(str(self.coco.anns[self.ids[index]]['caption']).lower()) for index in tqdm(np.arange(len(self.ids)))]
-            # тут ми зібрати довжини для кожного опису (len(caption_lengths)==len(all_tokens)==41k)
-            self.caption_lengths = [len(token) for token in all_tokens]            
-            
-            
-        if self.mode == 'val':
+        if self.mode == 'train' or self.mode == 'val':
             self.coco = COCO(annotations_file)
             self.ids = list(self.coco.anns.keys())
             print('Obtaining caption lengths...')
@@ -136,25 +144,20 @@ class CoCoDataset(data.Dataset):
             caption = self.coco.anns[ann_id]['caption']
             img_id = self.coco.anns[ann_id]['image_id']
             path = self.coco.loadImgs(img_id)[0]['file_name']
-
-            # Convert image to tensor and pre-process using transform
             image = Image.open(os.path.join(self.img_folder, path)).convert('RGB')
             image = self.transform(image)
 
             # Convert caption to tensor of word ids.
-            tokens = nltk.tokenize.word_tokenize(str(caption).lower()) #<----------------- знову для чогось препроцес
+            tokens = nltk.tokenize.word_tokenize(str(caption).lower()) 
             caption = []
             # forming input tensor 
             caption.append(self.vocab(self.vocab.start_word))
             caption.extend([self.vocab(token) for token in tokens])
             caption.append(self.vocab(self.vocab.end_word))
-            
-            mask = [False for _ in range(len(caption))] # + [True for _ in range(self.sel_length+1 - len(caption))]
-            # caption+=[0 for _ in range(self.sel_length+1 - len(caption))] # якщо раптом треба буде падити
-
             caption = torch.Tensor(caption).long()
+
             # return pre-processed image and caption tensors
-            return image, caption, np.array(mask)
+            return image, caption
         
         # obtain image if in test mode
         else:
@@ -169,12 +172,69 @@ class CoCoDataset(data.Dataset):
 
     def get_train_indices(self):
         """In this way we get captures in batch with the same length"""
-        # choose some length from all caption's lengths
         sel_length = np.random.choice(self.caption_lengths)
-        # select their indexes
-        all_indices = np.where([self.caption_lengths[i] == sel_length for i in np.arange(len(self.caption_lengths))])[0]
-        # all_indices = np.where([self.caption_lengths[i] >= sel_length-1 and self.caption_lengths[i] <= sel_length+1 for i in np.arange(len(self.caption_lengths))])[0]
-        # select batch_size indexes of the chosen lenght
+        all_indices = np.nonzero(self.caption_lengths == sel_length)[0]
+        indices = list(np.random.choice(all_indices, size=self.batch_size))
+        return indices #, sel_length + 1
+
+    def __len__(self):
+        if self.mode == 'train' or self.mode == 'val':
+            return len(self.ids)
+
+
+class InstaDataset(data.Dataset):
+    
+    def __init__(self, transform, mode, batch_size, vocab_threshold, vocab_file, glove_file, start_word, 
+        end_word, unk_word, annotations_file, vocab_from_file, img_folder):
+        self.transform = transform
+        self.mode = mode
+        self.batch_size = batch_size
+        self.vocab = Vocabulary(vocab_threshold, vocab_file, glove_file, start_word,
+                                end_word, unk_word, annotations_file, vocab_from_file, dataset='insta')
+        self.img_folder = img_folder
+        self.sel_length = None
+        if self.mode == 'train' or self.mode == 'val':
+            import time
+            start = time.time()
+            print('Start reading...')
+            self.insta = pickle.load(open(annotations_file, 'rb'))
+            print('Done: ', time.time()-start)
+            self.ids = list(self.insta.keys())
+            print('Obtaining caption lengths...')
+            all_tokens = [regex_tokenizer.tokenize(str(self.insta[index]['caption']).lower()) for index in tqdm(self.ids)]
+            #all_tokens = [nltk.tokenize.word_tokenize(str(self.insta[index]['caption']).lower()) for index in tqdm(self.ids)]
+            self.caption_lengths = [len(token) for token in all_tokens]
+        
+    def __getitem__(self, index):
+        # obtain image and caption if in training/val mode
+        if self.mode == 'train' or self.mode == 'val':
+            ann_id = self.ids[index]
+            caption = self.insta[ann_id]['caption']
+            path = ann_id
+            image = Image.open(os.path.join(self.img_folder, path)).convert('RGB')
+            image = self.transform(image)
+
+            # Convert caption to tensor of word ids.
+            tokens = regex_tokenizer.tokenize(str(caption).lower())
+            caption = []
+            # Forming input tensor 
+            caption.append(self.vocab(self.vocab.start_word))
+            caption.extend([self.vocab(token) for token in tokens])
+            caption.append(self.vocab(self.vocab.end_word))
+            caption = torch.Tensor(caption).long()
+            return image, caption
+        
+        else:
+
+            PIL_image = Image.open('image.jpg').convert('RGB')
+            orig_image = np.array(PIL_image)
+            image = self.transform(PIL_image)
+            return orig_image, image
+
+    def get_train_indices(self):
+        """In this way we get captures in batch with the same length"""
+        sel_length = np.random.choice(self.caption_lengths)
+        all_indices = np.nonzero(self.caption_lengths == sel_length)[0]
         indices = list(np.random.choice(all_indices, size=self.batch_size))
         return indices #, sel_length + 1
 
