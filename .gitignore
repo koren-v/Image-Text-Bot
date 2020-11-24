@@ -1,8 +1,11 @@
-/coco2014/
-/models/
 /.vscode/
-*.pkl
+.idea/
+
+# pycache
 /__pycache__/
+
+# data
+*.pkl
 /train2014
 /val2014
 /captions
@@ -10,3 +13,5 @@
 /glove_txt/
 /6B.300.dat
 /Insta
+/coco2014/
+/models/
