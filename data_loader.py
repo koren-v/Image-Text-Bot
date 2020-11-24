@@ -7,8 +7,7 @@ from PIL import Image
 from pycocotools.coco import COCO
 import numpy as np
 from tqdm import tqdm
-import random
-import json
+
 
 def get_loader(transform,
                mode='train',
@@ -36,23 +35,29 @@ def get_loader(transform,
     """
     
     assert mode in ['train', 'test', 'val'], "mode must be one of 'train', 'val' or 'test'."
-    if vocab_from_file==False: assert mode=='train' or mode=='val', "To generate vocab from captions file, must be in training  or val mode."
+    if not vocab_from_file:
+        assert mode == 'train' or mode == 'val',\
+            "To generate vocab from captions file, must be in training  or val mode."
 
     # Based on mode (train, val, test), obtain img_folder and annotations_file.
     if mode == 'train':
-        if vocab_from_file==True: assert os.path.exists(vocab_file), "vocab_file does not exist.  Change vocab_from_file to False to create vocab_file."
+        if vocab_from_file:
+            assert os.path.exists(vocab_file), \
+                "vocab_file does not exist.  Change vocab_from_file to False to create vocab_file."
         img_folder = './train2014/train2014/'
         annotations_file = './captions/annotations/captions_train2014.json'
     # validation
     if mode == 'val':
-        if vocab_from_file==True: assert os.path.exists(vocab_file), "vocab_file does not exist.  Change vocab_from_file to False to create vocab_file."
+        if vocab_from_file:
+            assert os.path.exists(vocab_file), \
+                "vocab_file does not exist.  Change vocab_from_file to False to create vocab_file."
         img_folder = './val2014/val2014/'
         annotations_file = './captions/annotations/captions_val2014.json'  
 
     if mode == 'test':
-        assert batch_size==1, "Please change batch_size to 1 if testing your model."
+        assert batch_size == 1, "Please change batch_size to 1 if testing your model."
         assert os.path.exists(vocab_file), "Must first generate vocab.pkl from training data."
-        assert vocab_from_file==True, "Change vocab_from_file to True."
+        assert vocab_from_file, "Change vocab_from_file to True."
         annotations_file = None
 
     # COCO caption dataset.
@@ -98,15 +103,16 @@ def get_loader(transform,
 
     return data_loader
 
+
 class CoCoDataset(data.Dataset):
-    
-    def __init__(self, transform, mode, batch_size, vocab_threshold, vocab_file, start_word, 
-        end_word, unk_word, annotations_file, vocab_from_file, img_folder):
+
+    def __init__(self, transform, mode, batch_size, vocab_threshold, vocab_file,
+                 start_word, end_word, unk_word, annotations_file, vocab_from_file, img_folder):
         self.transform = transform
         self.mode = mode
         self.batch_size = batch_size
         self.vocab = Vocabulary(vocab_threshold, vocab_file, start_word,
-            end_word, unk_word, annotations_file, vocab_from_file)
+                                end_word, unk_word, annotations_file, vocab_from_file)
         self.img_folder = img_folder
         self.sel_length = None
 
@@ -116,10 +122,9 @@ class CoCoDataset(data.Dataset):
             print('Obtaining caption lengths...')
 
             all_tokens = [nltk.tokenize.word_tokenize(str(self.coco.anns[self.ids[index]]['caption']).lower()) for index in tqdm(np.arange(len(self.ids)))]
-            # тут ми зібрати довжини для кожного опису (len(caption_lengths)==len(all_tokens)==41k)
+            # collect lentgths for each caption (len(caption_lengths)==len(all_tokens)==41k)
             self.caption_lengths = [len(token) for token in all_tokens]            
-            
-            
+
         if self.mode == 'val':
             self.coco = COCO(annotations_file)
             self.ids = list(self.coco.anns.keys())
@@ -127,7 +132,6 @@ class CoCoDataset(data.Dataset):
             all_tokens = [nltk.tokenize.word_tokenize(str(self.coco.anns[self.ids[index]]['caption']).lower()) for index in tqdm(np.arange(len(self.ids)))]
             self.caption_lengths = [len(token) for token in all_tokens]
 
-        
     def __getitem__(self, index):
 
         # obtain image and caption if in training/val mode
@@ -142,7 +146,7 @@ class CoCoDataset(data.Dataset):
             image = self.transform(image)
 
             # Convert caption to tensor of word ids.
-            tokens = nltk.tokenize.word_tokenize(str(caption).lower()) #<----------------- знову для чогось препроцес
+            tokens = nltk.tokenize.word_tokenize(str(caption).lower())
             caption = []
             # forming input tensor 
             caption.append(self.vocab(self.vocab.start_word))
@@ -150,7 +154,7 @@ class CoCoDataset(data.Dataset):
             caption.append(self.vocab(self.vocab.end_word))
             
             mask = [False for _ in range(len(caption))] # + [True for _ in range(self.sel_length+1 - len(caption))]
-            # caption+=[0 for _ in range(self.sel_length+1 - len(caption))] # якщо раптом треба буде падити
+            # caption+=[0 for _ in range(self.sel_length+1 - len(caption))]  # for padding
 
             caption = torch.Tensor(caption).long()
             # return pre-processed image and caption tensors
@@ -158,7 +162,6 @@ class CoCoDataset(data.Dataset):
         
         # obtain image if in test mode
         else:
-
             # Convert image to tensor and pre-process using transform
             PIL_image = Image.open('image.jpg').convert('RGB')
             orig_image = np.array(PIL_image)

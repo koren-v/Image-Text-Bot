@@ -4,17 +4,19 @@ import os.path
 from pycocotools.coco import COCO
 from collections import Counter
 
+
 class Vocabulary(object):
 
     def __init__(self,
-        vocab_threshold,
-        vocab_file='./vocab.pkl',
-        start_word="<start>",
-        end_word="<end>",
-        unk_word="<unk>",
-        annotations_file='./cocoapi/annotations/captions_train2014.json',
-        vocab_from_file=False):
-        """Initialize the vocabulary.
+                 vocab_threshold,
+                 vocab_file='./vocab.pkl',
+                 start_word="<start>",
+                 end_word="<end>",
+                 unk_word="<unk>",
+                 annotations_file='./cocoapi/annotations/captions_train2014.json',
+                 vocab_from_file=False):
+        """
+        Initialize the vocabulary.
         Args:
           vocab_threshold: Minimum word count threshold.
           vocab_file: File containing the vocabulary.
@@ -33,6 +35,11 @@ class Vocabulary(object):
         self.annotations_file = annotations_file
         self.vocab_from_file = vocab_from_file
         self.get_vocab()
+
+        # to set them during vocab creation
+        self.word2idx = None
+        self.idx2word = None
+        self.idx = None
 
     def get_vocab(self):
         """Load the vocabulary from file OR build the vocabulary from scratch."""
@@ -63,7 +70,7 @@ class Vocabulary(object):
 
     def add_word(self, word):
         """Add a token to the vocabulary."""
-        if not word in self.word2idx:
+        if word not in self.word2idx:
             self.word2idx[word] = self.idx
             self.idx2word[self.idx] = word
             self.idx += 1
@@ -73,8 +80,8 @@ class Vocabulary(object):
         coco = COCO(self.annotations_file)
         counter = Counter()
         ids = coco.anns.keys()
-        for i, id in enumerate(ids):
-            caption = str(coco.anns[id]['caption'])
+        for i, idx in enumerate(ids):
+            caption = str(coco.anns[idx]['caption'])
             tokens = nltk.tokenize.word_tokenize(caption.lower())
             counter.update(tokens)
 
@@ -87,7 +94,7 @@ class Vocabulary(object):
             self.add_word(word)
 
     def __call__(self, word):
-        if not word in self.word2idx:
+        if word not in self.word2idx:
             return self.word2idx[self.unk_word]
         return self.word2idx[word]
 

@@ -38,8 +38,12 @@ class DecoderRNN(nn.Module):
                             hidden_size=hidden_size,
                             num_layers=num_layers,
                             batch_first=True, 
-                            bidirectional=False)        
-        
+                            bidirectional=False)
+
+        # to store them during forward pass
+        self.batch_size = None
+        self.hidden = None
+
     def init_hidden(self, batch_size):        
         return torch.zeros(self.num_layers, batch_size, self.hidden_size).to(device), \
                                 torch.zeros(self.num_layers, batch_size, self.hidden_size).to(device)
@@ -49,9 +53,9 @@ class DecoderRNN(nn.Module):
         self.batch_size = features.shape[0]
         self.hidden = self.init_hidden(self.batch_size)
         embeds = self.word_embeddings(captions)       
-        inputs = torch.cat((features.unsqueeze(dim=1),embeds), dim=1)                      
-        lstm_out, self.hidden = self.lstm(inputs,self.hidden)
-        outputs=self.linear(lstm_out)       
+        inputs = torch.cat((features.unsqueeze(dim=1), embeds), dim=1)
+        lstm_out, self.hidden = self.lstm(inputs, self.hidden)
+        outputs = self.linear(lstm_out)
         return outputs 
 
     def greedy_sample(self, inputs):        
@@ -67,14 +71,14 @@ class DecoderRNN(nn.Module):
             outputs = outputs.squeeze(1) 
             _, max_idx = torch.max(outputs, dim=1) 
             cap_output.append(max_idx.cpu().numpy()[0].item())             
-            if (max_idx == 1):
+            if max_idx == 1:
                 break
             
             inputs = self.word_embeddings(max_idx) 
             inputs = inputs.unsqueeze(1)
 
             max_len += 1
-            if (max_len) == 20:
+            if max_len == 20:
                 break
 
         return cap_output    
@@ -100,13 +104,13 @@ class DecoderRNN(nn.Module):
         embeddings = [self.word_embeddings(idx.unsqueeze(0)).unsqueeze(1) for idx in indexes]
 
         # hiddens are the same for k generated words but it will more
-        # convinient to use them in the same 'style' as other objects 
+        # convenient to use them in the same 'style' as other objects
         hiddens = [hidden]*k
 
         # collecting sentences
         sentences = [[index] for index in indexes]
 
-        # startin length of each sentence is 1 now
+        # starting length of each sentence is 1 now
         length = 1
         
         while True:
@@ -140,14 +144,13 @@ class DecoderRNN(nn.Module):
                 current_indexes = torch.cat((current_indexes, temp_indexes))
                 current_hiddens.extend([h_out]*k)
 
-            
-            candidates = torch.topk(current_scores, k)[1] # indexes in arrays for best childs
-            best_candidates_indexes = current_indexes[candidates] # indexes in vocab -||-
-            best_candidates_scores = current_scores[candidates] # their scores
+            candidates = torch.topk(current_scores, k)[1]  # indexes in arrays for best children
+            best_candidates_indexes = current_indexes[candidates]  # indexes in vocab -||-
+            best_candidates_scores = current_scores[candidates]  # their scores
             best_hiddens = [current_hiddens[candidate] for candidate in candidates] 
 
-            scores = best_candidates_scores # updating scores
-            indexes = best_candidates_indexes # updating indexes (to generate next words)
+            scores = best_candidates_scores  # updating scores
+            indexes = best_candidates_indexes  # updating indexes (to generate next words)
             embeddings = [self.word_embeddings(idx.unsqueeze(0)).unsqueeze(1) for idx in indexes]
             hiddens = best_hiddens
 
@@ -158,21 +161,20 @@ class DecoderRNN(nn.Module):
                 temp.append(sts)
                 temp[i].append(current_indexes[idx])
 
-            # updatinf current sentences
+            # updating current sentences
             sentences = temp      
 
             if length == 20:
                 break
             
-        # deviding score to length of the sentence
+        # dividing score to length of the sentence
         normalized_score = []
         for i, score in enumerate(scores):
             try:
                 score /= sentences[i].index(1)
-            except:
-                score /= len(sentences[i]) # if we don't get by generating <eos> token
+            except IndexError:
+                score /= len(sentences[i])  # if we don't get by generating <eos> token
             normalized_score.append(float(score))
-
 
         print('\nMEAN: ', np.mean(normalized_score))
         print('STD: ', np.std(normalized_score))
@@ -185,9 +187,9 @@ class DecoderRNN(nn.Module):
         # returning truncated sentence 
         try:
             best_sentence = best_sentence[:best_sentence.index(1)]
-        except:
+        except IndexError:
             best_sentence = best_sentence
-        best_sentence =  [int(word) for word in best_sentence]
+        best_sentence = [int(word) for word in best_sentence]
 
         return best_sentence
 
@@ -197,8 +199,7 @@ class LanguageTransformer(nn.Module):
         super().__init__()
         self.embedding_size = embedding_size
 
-        #self.embed_src = nn.Embedding(vocab_size, embedding_size)
-        self.embed_tgt = nn.Embedding(vocab_size, embedding_size) #vocab_size, embed_size
+        self.embed_tgt = nn.Embedding(vocab_size, embedding_size)  # vocab_size, embed_size
         self.pos_enc = PositionalEncoding(embedding_size, pos_dropout, max_seq_length)
 
         self.transformer = nn.Transformer(embedding_size, nhead, num_encoder_layers, num_decoder_layers, dim_feedforward, trans_dropout)
@@ -208,7 +209,7 @@ class LanguageTransformer(nn.Module):
         # src = rearrange(src, 'n s -> s n')
         # tgt = rearrange(tgt, 'n t -> t n')
         # src = src.unsqueeze(0)  # [1, batch_size, embed_size]
-        tgt = tgt.permute(1, 0) # [len_of_capture, batch_size, embed_size]
+        tgt = tgt.permute(1, 0)  # [len_of_capture, batch_size, embed_size]
 
         # src = self.pos_enc(self.embed_src(src) * math.sqrt(self.embedding_size)) 
         tgt = self.pos_enc(self.embed_tgt(tgt) * math.sqrt(self.embedding_size))
@@ -218,6 +219,7 @@ class LanguageTransformer(nn.Module):
         # output = rearrange(output, 't n e -> n t e')
         output = output.permute(1, 0, 2)
         return self.fc(output)
+
 
 class PositionalEncoding(nn.Module):
     def __init__(self, embedding_size, dropout=0.1, max_len=100):

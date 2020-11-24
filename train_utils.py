@@ -10,12 +10,14 @@ from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 
 chencherry = SmoothingFunction()
 
+
 def collect_preds(raw_preds, outputs):
-    if len(raw_preds)==0:
+    if len(raw_preds) == 0:
       raw_preds = outputs.cpu().detach().numpy()
     else:
       raw_preds = np.vstack((raw_preds, outputs.cpu().detach().numpy()))
     return raw_preds
+        
         
 def compute_metric(captions, preds):
     preds = torch.argmax(preds, axis=2)
@@ -25,10 +27,12 @@ def compute_metric(captions, preds):
         bleu_score += sentence_bleu([ground_truth.tolist()], pred.tolist(), smoothing_function=chencherry.method1)
     return bleu_score/len(captions)
 
+
 def gen_nopeek_mask(length):
     mask = torch.triu(torch.ones(length, length)).permute(1, 0)
     mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
     return mask
+
 
 def add_examples(captions_out, outputs, data_loader, num_examples=4):
     examples = ''
@@ -40,13 +44,14 @@ def add_examples(captions_out, outputs, data_loader, num_examples=4):
         examples += ' '.join(truth_text) + '/' + ' '.join(preds_text) + '\n'
     return examples
 
+
 def epoch(model, phase, device, criterion, optimizer, 
-          data_loader, tb, grad_acumulation_step, scheduler=None):
+          data_loader, tb, grad_accumulation_step, scheduler=None):
 
     encoder = model['encoder']
     decoder = model['decoder']
 
-    if phase=='train': 
+    if phase == 'train':
         encoder.train()
         decoder.train()
     else: 
@@ -56,14 +61,11 @@ def epoch(model, phase, device, criterion, optimizer,
     running_loss = 0.0
     running_bleu = 0.0
     batches_skiped = 0
-    captionss = np.array([])
-    raw_preds = np.array([])
     
     vocab_size = len(data_loader.dataset.vocab)
     total_steps = math.ceil(len(data_loader.dataset.caption_lengths)\
                              / data_loader.batch_sampler.batch_size)
 
-    #optimizer.zero_grad()
     for step in range(total_steps):
         
         indices = data_loader.dataset.get_train_indices()        
@@ -72,8 +74,8 @@ def epoch(model, phase, device, criterion, optimizer,
 
         try:
             images, captions, tgt_key_padding_mask = next(iter(data_loader))
-        except:
-            batches_skiped+=1
+        except BaseException:
+            batches_skiped += 1
             continue
 
         images = images.to(device)
@@ -95,21 +97,20 @@ def epoch(model, phase, device, criterion, optimizer,
             loss = criterion(outputs.view(-1, vocab_size), captions_out.reshape(-1))
 
             examples = add_examples(captions_out, outputs, data_loader)
-            import pdb
-            pdb.set_trace()
             tb.add_text('ground_truth/predictions', examples, step)
 
             if phase == 'train':
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(decoder.parameters(), 1.0)
-                if (step+1)%grad_acumulation_step == 0:    
+                if (step+1) % grad_accumulation_step == 0:
                     optimizer.step()
-                    if scheduler: scheduler.step()
+                    if scheduler:
+                        scheduler.step()
                     optimizer.zero_grad()
 
         running_loss += loss.item() * features.size(0)
         bleu4 = compute_metric(captions_out, outputs)
-        running_bleu+=bleu4
+        running_bleu += bleu4
 
         stats = 'Step [{}/{}], Loss: {:.4f}, BLEU-4: {:.4f}'.format(step, total_steps, loss.item(), bleu4)
 
@@ -119,22 +120,21 @@ def epoch(model, phase, device, criterion, optimizer,
         tb.add_scalar('{} Batch Loss'.format(phase.title()), loss.item(), step)
         tb.add_scalar('{} Batch BLEU'.format(phase.title()), bleu4, step)
     
-    epoch_loss = running_loss / len(data_loader.dataset.caption_lengths) #len of the data
+    epoch_loss = running_loss / len(data_loader.dataset.caption_lengths)  # len of the data
     epoch_bleu = running_bleu / total_steps
-    epoch_dict = {'batches_skiped':batches_skiped,
+    epoch_dict = {'batches_skiped': batches_skiped,
                   'epoch_loss': epoch_loss, 
                   'epoch_bleu': epoch_bleu,
                   'encoder': encoder,
                   'decoder': decoder}
     return epoch_dict
 
+
 def fit(model, criterion, optimizer, dataloader_dict,
-        num_epochs, device, stage, hyper_params, scheduler=None, last_epoch=None, grad_acumulation_step = 1):
+        num_epochs, device, stage, hyper_params, scheduler=None,
+        last_epoch=None, grad_accumulation_step=1):
 
     tb = SummaryWriter(comment=stage)
-    # tb.add_graph(model['encoder'])
-    # tb.add_graph(model['decoder'])
-    best_loss = float('inf')
     train_loss = []
     valid_loss = []
     train_bleu = []
@@ -147,7 +147,7 @@ def fit(model, criterion, optimizer, dataloader_dict,
 
             epoch_dict = epoch(model, phase, device, criterion, optimizer, 
                                dataloader_dict[phase], tb, 
-                               grad_acumulation_step = grad_acumulation_step, 
+                               grad_accumulation_step = grad_accumulation_step, 
                                scheduler=scheduler)
             
             print('\n{} epoch loss: {:.4f} '.format(phase , epoch_dict['epoch_loss']))
@@ -156,7 +156,7 @@ def fit(model, criterion, optimizer, dataloader_dict,
             tb.add_scalar('{} Epoch Loss'.format(phase.title()), epoch_dict['epoch_loss'], i)
             tb.add_scalar('{} Epoch BLEU'.format(phase.title()), epoch_dict['epoch_bleu'], i)
 
-            # probably it is unnessesury lists
+            # probably it is unnecessary lists
             if phase == 'train': 
                 train_loss.append(epoch_dict['epoch_loss'])
                 train_bleu.append(epoch_dict['epoch_bleu'])
@@ -172,16 +172,9 @@ def fit(model, criterion, optimizer, dataloader_dict,
                                 os.path.join('./models', 'decoder'+model_name))
                 torch.save(epoch_dict['encoder'].state_dict(),
                                 os.path.join('./models', 'encoder'+model_name))
-                
 
-            # not implemented loading best model weights callback
-            # if phase == 'val' and best_loss>epoch_dict['epoch_loss']:
-            #     best_encoder_wts = copy.deepcopy(epoch_dict['encoder'].state_dict())
-            #     best_decoder_wts = copy.deepcopy(epoch_dict['decoder'].state_dict())
-            #     best_loss = epoch_dict['epoch_loss']
         print()
     print('Batches skipped', epoch_dict['batches_skiped'])
-    #print('Best validation loss: {:4f}'.format(float(best_loss)))
     metrics = {'Train_Loss': train_loss[-1], 'Val_Loss': valid_loss[-1],
                'Train_Bleu': train_bleu[-1], 'Valid_Bleu': valid_bleu[-1]}
 

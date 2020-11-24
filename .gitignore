@@ -1,8 +1,11 @@
+.idea/
+#pycache
+/__pycache__/
+# data
 /coco2014/
 /models/
 /.vscode/
 vocab.pkl
-/__pycache__/
 train2014
 val2014
 captions
