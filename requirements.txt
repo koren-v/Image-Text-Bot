@@ -1,4 +1,4 @@
-nltk==3.4.5
+nltk==3.6.6
 numpy==1.18.1
 Pillow==7.0.0
 torch==1.4.0
